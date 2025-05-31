@@ -1,0 +1,11 @@
+[profile.default]
+src = 'contracts'
+out = 'out'
+--via-ir = true
+libs = [
+    'lib'
+]
+ffi=true
+verbosity=5
+
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config
