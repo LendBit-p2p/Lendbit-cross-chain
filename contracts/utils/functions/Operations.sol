@@ -1173,26 +1173,6 @@ contract Operations is AppStorage {
     //     _appStorage.swapRouter = _swapRouter;
     // }
 
-    function withdrawFees(
-        address _token,
-        address _to,
-        uint256 amount
-    ) external {
-        LibDiamond.enforceIsContractOwner();
-        require(_to != address(0), "invalid address");
-
-        uint256 _feesAccrued = _appStorage.s_feesAccrued[_token];
-        require(_feesAccrued >= amount, "insufficient fees");
-        _appStorage.s_feesAccrued[_token] = _feesAccrued - amount;
-        if (_token == Constants.NATIVE_TOKEN) {
-            (bool sent, ) = payable(_to).call{value: amount}("");
-            require(sent, "failed to send Ether");
-        } else {
-            IERC20(_token).safeTransfer(_to, amount);
-        }
-        emit FeesWithdrawn(_to, _token, amount);
-    }
-
     function _settleFees(
         address _token,
         uint256 _amount

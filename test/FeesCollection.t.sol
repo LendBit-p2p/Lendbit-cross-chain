@@ -310,7 +310,11 @@ contract ProtocolTest is Test, IDiamondCut {
         // assuming 1% fee rate
         assertEq(_feesAccruedUsdt, 770_000e18);
 
-        protocol.withdrawFees(DAI_CONTRACT_ADDRESS, C, 500_000e18);
+        OwnershipFacet(address(diamond)).withdrawFees(
+            DAI_CONTRACT_ADDRESS,
+            C,
+            500_000e18
+        );
         uint256 _feesAfterWithdrawal = gettersFacet.getFeesAccrued(
             DAI_CONTRACT_ADDRESS
         );
@@ -350,7 +354,11 @@ contract ProtocolTest is Test, IDiamondCut {
         // assuming 1% fee rate
         assertEq(_feesAccruedEth, _feeAccrued);
 
-        protocol.withdrawFees(ETH_CONTRACT_ADDRESS, C, 1000e18);
+        OwnershipFacet(address(diamond)).withdrawFees(
+            ETH_CONTRACT_ADDRESS,
+            C,
+            1000e18
+        );
         uint256 _feesAfterWithdrawal = gettersFacet.getFeesAccrued(
             ETH_CONTRACT_ADDRESS
         );
@@ -364,19 +372,31 @@ contract ProtocolTest is Test, IDiamondCut {
         testFeeWithdrawalERC20();
         vm.startPrank(B);
         vm.expectRevert(LibDiamond.NotDiamondOwner.selector);
-        protocolFacet.withdrawFees(USDT_CONTRACT_ADDRESS, C, 1000e18);
+        OwnershipFacet(address(diamond)).withdrawFees(
+            USDT_CONTRACT_ADDRESS,
+            C,
+            1000e18
+        );
     }
 
     function testWithdrawRevertsIfZeroAddress() public {
         testFeeWithdrawalERC20();
         vm.expectRevert("invalid address");
-        protocolFacet.withdrawFees(USDT_CONTRACT_ADDRESS, address(0), 1000e18);
+        OwnershipFacet(address(diamond)).withdrawFees(
+            USDT_CONTRACT_ADDRESS,
+            address(0),
+            1000e18
+        );
     }
 
     function testWithdrawRevertsIfFeesLowerThatWithdrawAmount() public {
         testFeeWithdrawalERC20();
         vm.expectRevert("insufficient fees");
-        protocolFacet.withdrawFees(USDT_CONTRACT_ADDRESS, C, 100_000_000e18);
+        OwnershipFacet(address(diamond)).withdrawFees(
+            USDT_CONTRACT_ADDRESS,
+            C,
+            100_000_000e18
+        );
     }
 
     function testFeeRateCannotExceedTenPercent() public {

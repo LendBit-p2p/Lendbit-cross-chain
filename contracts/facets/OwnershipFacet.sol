@@ -6,10 +6,14 @@ import {IERC173} from "../interfaces/IERC173.sol";
 import {AppStorage} from "../utils/functions/AppStorage.sol";
 import {ProtocolPool, TokenData, UserBorrowData} from "../model/Protocol.sol";
 import {Constants} from "../utils/constants/Constant.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/validators/Error.sol";
 import "../model/Event.sol";
 
 contract OwnershipFacet is IERC173, AppStorage {
+    using SafeERC20 for IERC20;
+
     function transferOwnership(address _newOwner) external override {
         LibDiamond.enforceIsContractOwner();
         LibDiamond.setContractOwner(_newOwner);
@@ -104,5 +108,32 @@ contract OwnershipFacet is IERC173, AppStorage {
         require(_rateBps <= 1000, "rate cannot exceed 10%");
 
         _appStorage.feeRateBps = _rateBps;
+    }
+
+    /**
+     * @notice Withdraws fees from the protocol
+     * @dev Only callable by contract owner
+     * @param _token The address of the token to withdraw
+     * @param _to The address to send the fees to
+     * @param amount The amount of fees to withdraw
+     */
+    function withdrawFees(
+        address _token,
+        address _to,
+        uint256 amount
+    ) external {
+        LibDiamond.enforceIsContractOwner();
+        require(_to != address(0), "invalid address");
+
+        uint256 _feesAccrued = _appStorage.s_feesAccrued[_token];
+        require(_feesAccrued >= amount, "insufficient fees");
+        _appStorage.s_feesAccrued[_token] = _feesAccrued - amount;
+        if (_token == Constants.NATIVE_TOKEN) {
+            (bool sent, ) = payable(_to).call{value: amount}("");
+            require(sent, "failed to send Ether");
+        } else {
+            IERC20(_token).safeTransfer(_to, amount);
+        }
+        emit FeesWithdrawn(_to, _token, amount);
     }
 }
