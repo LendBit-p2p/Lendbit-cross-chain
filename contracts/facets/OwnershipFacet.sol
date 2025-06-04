@@ -136,4 +136,107 @@ contract OwnershipFacet is IERC173, AppStorage {
         }
         emit FeesWithdrawn(_to, _token, amount);
     }
+
+    /**
+     * @dev Adds new collateral tokens along with their respective price feeds to the protocol.
+     * @param _tokens An array of token addresses to add as collateral.
+     * @param _priceFeeds An array of corresponding price feed addresses for the tokens.
+     *
+     * Requirements:
+     * - Only the contract owner can call this function.
+     * - The `_tokens` and `_priceFeeds` arrays must have the same length.
+     *
+     * Emits an `UpdatedCollateralTokens` event with the total number of collateral tokens added.
+     */
+    function addCollateralTokens(
+        address[] memory _tokens,
+        address[] memory _priceFeeds
+    ) external {
+        // Ensure only the contract owner can add collateral tokens
+        LibDiamond.enforceIsContractOwner();
+
+        // Validate that the tokens and price feeds arrays have the same length
+        if (_tokens.length != _priceFeeds.length) {
+            revert Protocol__tokensAndPriceFeedsArrayMustBeSameLength();
+        }
+
+        // Loop through each token to set its price feed and add it to the collateral list
+        for (uint8 i = 0; i < _tokens.length; i++) {
+            _appStorage.s_priceFeeds[_tokens[i]] = _priceFeeds[i]; // Map token to price feed
+            _appStorage.s_collateralToken.push(_tokens[i]); // Add token to collateral array
+        }
+
+        // Emit an event indicating the updated number of collateral tokens
+        emit UpdatedCollateralTokens(
+            msg.sender,
+            uint8(_appStorage.s_collateralToken.length)
+        );
+    }
+
+    /**
+     * @dev Removes specified collateral tokens and their associated price feeds from the protocol.
+     * @param _tokens An array of token addresses to be removed as collateral.
+     *
+     * Requirements:
+     * - Only the contract owner can call this function.
+     *
+     * Emits an `UpdatedCollateralTokens` event with the updated total number of collateral tokens.
+     */
+    function removeCollateralTokens(address[] memory _tokens) external {
+        // Ensure only the contract owner can remove collateral tokens
+        LibDiamond.enforceIsContractOwner();
+
+        // Loop through each token to remove it from collateral and reset its price feed
+        for (uint8 i = 0; i < _tokens.length; i++) {
+            _appStorage.s_priceFeeds[_tokens[i]] = address(0); // Remove the price feed for the token
+
+            // Search for the token in the collateral array
+            for (uint8 j = 0; j < _appStorage.s_collateralToken.length; j++) {
+                if (_appStorage.s_collateralToken[j] == _tokens[i]) {
+                    // Replace the token to be removed with the last token in the array
+                    _appStorage.s_collateralToken[j] = _appStorage
+                        .s_collateralToken[
+                            _appStorage.s_collateralToken.length - 1
+                        ];
+
+                    // Remove the last token from the array
+                    _appStorage.s_collateralToken.pop();
+                    break; // Stop searching once the token is found and removed
+                }
+            }
+        }
+
+        // Emit an event indicating the updated count of collateral tokens
+        emit UpdatedCollateralTokens(
+            msg.sender,
+            uint8(_appStorage.s_collateralToken.length)
+        );
+    }
+
+    /**
+     * @dev Adds a new token as a loanable token and associates it with a price feed.
+     * @param _token The address of the token to be added as loanable.
+     * @param _priceFeed The address of the price feed for the loanable token.
+     *
+     * Requirements:
+     * - Only the contract owner can call this function.
+     *
+     * Emits an `UpdateLoanableToken` event indicating the new loanable token and its price feed.
+     */
+    function addLoanableToken(address _token, address _priceFeed) external {
+        // Ensure only the contract owner can add loanable tokens
+        LibDiamond.enforceIsContractOwner();
+
+        // Mark the token as loanable
+        _appStorage.s_isLoanable[_token] = true;
+
+        // Associate the token with its price feed
+        _appStorage.s_priceFeeds[_token] = _priceFeed;
+
+        // Add the loanable token to the list of loanable tokens
+        _appStorage.s_loanableToken.push(_token);
+
+        // Emit an event to notify that a loanable token has been added
+        emit UpdateLoanableToken(_token, _priceFeed, msg.sender);
+    }
 }
