@@ -151,7 +151,7 @@ contract ProtocolTest is Test, IDiamondCut {
         // protocolFacet.setBotAddress(botAddress);
         // protocolFacet.setSwapRouter(swapRouterAddress);
 
-        ProtocolFacet(address(diamond)).setFeeRate(100);
+        OwnershipFacet(address(diamond)).setFeeRate(100);
 
         transferTokenToOwner();
     }
@@ -201,7 +201,7 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 _slopeRate = 2000; // 20%
         // uint256 _initialSupply = 100 ether;
 
-        liquidityPoolFacet.initializeProtocolPool(
+        OwnershipFacet(address(diamond)).initializeProtocolPool(
             DAI_CONTRACT_ADDRESS,
             _reserveFactor,
             _optimalUtilization,
@@ -238,7 +238,7 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 _slopeRate = 2000; // 20%
         uint256 _initialSupply = 100 ether;
 
-        liquidityPoolFacet.initializeProtocolPool{value: _initialSupply}(
+        OwnershipFacet(address(diamond)).initializeProtocolPool(
             ETH_CONTRACT_ADDRESS,
             _reserveFactor,
             _optimalUtilization,
@@ -415,7 +415,10 @@ contract ProtocolTest is Test, IDiamondCut {
         // Owner deposits to the pool
         liquidityPoolFacet.deposit(DAI_CONTRACT_ADDRESS, DEPOSIT_AMOUNT);
 
-        liquidityPoolFacet.setPoolActive(DAI_CONTRACT_ADDRESS, false); // Add this function if needed
+        OwnershipFacet(address(diamond)).setPoolActive(
+            DAI_CONTRACT_ADDRESS,
+            false
+        ); // Add this function if needed
 
         // Deposit collateral as B
         _depositCollateral(B, ETH_CONTRACT_ADDRESS, 200 ether);
@@ -947,7 +950,7 @@ contract ProtocolTest is Test, IDiamondCut {
 
         IERC20(_token).approve(address(protocolFacet), type(uint256).max);
 
-        liquidityPoolFacet.initializeProtocolPool(
+        OwnershipFacet(address(diamond)).initializeProtocolPool(
             _token,
             _reserveFactor,
             _optimalUtilization,

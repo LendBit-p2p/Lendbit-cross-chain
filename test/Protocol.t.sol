@@ -106,7 +106,7 @@ contract ProtocolTest is Test, IDiamondCut {
             })
         );
 
-        cut[2] = (
+        cut[3] = (
             FacetCut({
                 facetAddress: address(gettersFacet),
                 action: FacetCutAction.Add,
