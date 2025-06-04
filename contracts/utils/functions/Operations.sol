@@ -1173,13 +1173,6 @@ contract Operations is AppStorage {
     //     _appStorage.swapRouter = _swapRouter;
     // }
 
-    function setFeeRate(uint16 _rateBps) external {
-        LibDiamond.enforceIsContractOwner();
-        require(_rateBps <= 1000, "rate cannot exceed 10%");
-
-        _appStorage.feeRateBps = _rateBps;
-    }
-
     function withdrawFees(
         address _token,
         address _to,

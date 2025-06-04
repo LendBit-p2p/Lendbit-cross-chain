@@ -94,4 +94,15 @@ contract OwnershipFacet is IERC173, AppStorage {
         _appStorage.s_protocolFeeRecipient = _feeRecipient;
         emit ProtocolFeeRecipientSet(_feeRecipient);
     }
+
+    /**
+     * @notice Sets the protocol fee rate
+     * @param _rateBps The new fee rate
+     */
+    function setFeeRate(uint16 _rateBps) external {
+        LibDiamond.enforceIsContractOwner();
+        require(_rateBps <= 1000, "rate cannot exceed 10%");
+
+        _appStorage.feeRateBps = _rateBps;
+    }
 }

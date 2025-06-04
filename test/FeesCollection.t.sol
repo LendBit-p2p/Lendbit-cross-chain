@@ -160,7 +160,7 @@ contract ProtocolTest is Test, IDiamondCut {
         // protocolFacet.setBotAddress(botAddress);
         // protocolFacet.setSwapRouter(swapRouterAddress);
 
-        ProtocolFacet(address(diamond)).setFeeRate(100);
+        OwnershipFacet(address(diamond)).setFeeRate(100);
 
         transferTokenToOwner();
     }
@@ -381,13 +381,13 @@ contract ProtocolTest is Test, IDiamondCut {
 
     function testFeeRateCannotExceedTenPercent() public {
         vm.expectRevert("rate cannot exceed 10%");
-        protocolFacet.setFeeRate(1001);
+        OwnershipFacet(address(diamond)).setFeeRate(1001);
     }
 
     function testSetFeeRateRevertsIfNotContractOwner() public {
         vm.startPrank(B);
         vm.expectRevert(LibDiamond.NotDiamondOwner.selector);
-        protocolFacet.setFeeRate(1000);
+        OwnershipFacet(address(diamond)).setFeeRate(1000);
     }
 
     function _depositCollateral(

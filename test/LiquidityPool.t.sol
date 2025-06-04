@@ -151,7 +151,7 @@ contract ProtocolTest is Test, IDiamondCut {
         // protocolFacet.setBotAddress(botAddress);
         // protocolFacet.setSwapRouter(swapRouterAddress);
 
-        ProtocolFacet(address(diamond)).setFeeRate(100);
+        OwnershipFacet(address(diamond)).setFeeRate(100);
 
         transferTokenToOwner();
     }
