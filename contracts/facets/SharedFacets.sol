@@ -56,4 +56,24 @@ contract SharedFacet is AppStorage {
             msg.sender
         );
     }
+
+    /**
+     * @dev Allows anyone to liquidate a loan.
+     * @param {uint96} The ID of the loan to liquidate.
+     * @param {bool} Whether the loan is from the liquidity pool.
+     *
+     * Requirements:
+     * - The loan must be in the active state.
+     * - The loan must be undercollateralized.
+     * - The loan must have a valid lender.
+     * - The loan must have a valid borrower.
+     * @return _isLiquidated Whether the loan was successfully liquidated.
+     */
+    function liquidateLoans(
+        uint96 /*_requestId*/,
+        bool /*_isLP*/
+    ) external payable returns (bool _isLiquidated) {
+        //TODO: Implement the liquidation logic
+        return true;
+    }
 }
