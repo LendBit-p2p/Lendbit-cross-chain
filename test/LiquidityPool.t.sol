@@ -415,7 +415,7 @@ contract ProtocolTest is Test, IDiamondCut {
         // Owner deposits to the pool
         liquidityPoolFacet.deposit(DAI_CONTRACT_ADDRESS, DEPOSIT_AMOUNT);
 
-        liquidityPoolFacet.setPoolActive(DAI_CONTRACT_ADDRESS, false); // Add this function if needed
+        ownerF.setPoolActive(DAI_CONTRACT_ADDRESS, false); // Add this function if needed
 
         // Deposit collateral as B
         _depositCollateral(B, ETH_CONTRACT_ADDRESS, 200 ether);
