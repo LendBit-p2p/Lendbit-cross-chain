@@ -116,7 +116,7 @@ contract ProtocolTest is Test, IDiamondCut {
 
         diamond.initialize(tokens, priceFeed);
         protocolFacet = ProtocolFacet(address(diamond));
-        protocolFacet.setProtocolFeeRecipient(feeRecipent);
+        OwnershipFacet(address(diamond)).setProtocolFeeRecipient(feeRecipent);
         ProtocolFacet(address(diamond)).setFeeRate(100);
 
         transferTokenToOwner();

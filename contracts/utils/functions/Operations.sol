@@ -982,12 +982,6 @@ contract Operations is AppStorage {
         );
     }
 
-    function setProtocolFeeRecipient(address _feeRecipient) external {
-        LibDiamond.enforceIsContractOwner();
-        _appStorage.s_protocolFeeRecipient = _feeRecipient;
-        emit ProtocolFeeRecipientSet(_feeRecipient);
-    }
-
     // /**
     //  * @dev Liquidates the collateral associated with a loan request and compensates the lender.
     //  * @param requestId The unique identifier of the loan request to be liquidated.

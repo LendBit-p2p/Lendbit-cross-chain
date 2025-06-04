@@ -84,4 +84,14 @@ contract OwnershipFacet is IERC173, AppStorage {
         LibDiamond.enforceIsContractOwner();
         _appStorage.s_protocolPool[token].isActive = isActive;
     }
+
+    /**
+     * @notice Sets the protocol fee recipient
+     * @param _feeRecipient The address of the fee recipient
+     */
+    function setProtocolFeeRecipient(address _feeRecipient) external {
+        LibDiamond.enforceIsContractOwner();
+        _appStorage.s_protocolFeeRecipient = _feeRecipient;
+        emit ProtocolFeeRecipientSet(_feeRecipient);
+    }
 }
