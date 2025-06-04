@@ -6,11 +6,23 @@ import "../libraries/LibAppStorage.sol";
 import "../utils/functions/AppStorage.sol";
 
 /**
-
+ * @title SharedFacet
+ * @notice This facet provides functions that both the LiquidityPoolsFacet and P2PFacet share.
  */
 contract SharedFacet is AppStorage {
     using LibShared for LibAppStorage.Layout;
 
+    /**
+     * @dev Allows a user to deposit collateral.
+     * @param _tokenCollateralAddress The address of the collateral token to deposit.
+     * @param _amountOfCollateral The amount of collateral to deposit.
+     *
+     * Requirements:
+     * - The token address must be valid and allowed by the protocol.
+     * - The deposit amount must be greater than zero.
+     *
+     * Emits a `CollateralDeposited` event on successful deposit.
+     */
     function depositCollateral(
         address _tokenCollateralAddress,
         uint256 _amountOfCollateral
@@ -22,6 +34,18 @@ contract SharedFacet is AppStorage {
         );
     }
 
+    /**
+     * @dev Allows a user to withdraw a specified amount of collateral.
+     * @param _tokenCollateralAddress The address of the collateral token to withdraw.
+     * @param _amountOfCollateral The amount of collateral to withdraw.
+     *
+     * Requirements:
+     * - The token address must be valid and allowed by the protocol.
+     * - The withdrawal amount must be greater than zero.
+     * - User must have at least the specified amount of collateral deposited.
+     *
+     * Emits a `CollateralWithdrawn` event on successful withdrawal.
+     */
     function withdrawCollateral(
         address _tokenCollateralAddress,
         uint256 _amountOfCollateral

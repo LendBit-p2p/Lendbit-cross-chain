@@ -13,6 +13,12 @@ import "./LibAppStorage.sol";
 library LibShared {
     using SafeERC20 for IERC20;
 
+    /**
+     * @dev Allows a user to deposit collateral.
+     * @param _tokenCollateralAddress The address of the collateral token to deposit.
+     * @param _amountOfCollateral The amount of collateral to deposit.
+     * @param _user The address of the user depositing the collateral.
+     */
     function _depositCollateral(
         LibAppStorage.Layout storage _appStorage,
         address _tokenCollateralAddress,
@@ -62,6 +68,12 @@ library LibShared {
         );
     }
 
+    /**
+     * @dev Allows a user to withdraw a specified amount of collateral.
+     * @param _tokenCollateralAddress The address of the collateral token to withdraw.
+     * @param _amount The amount of collateral to withdraw.
+     * @param _user The address of the user withdrawing the collateral.
+     */
     function _withdrawCollateral(
         LibAppStorage.Layout storage _appStorage,
         address _tokenCollateralAddress,
