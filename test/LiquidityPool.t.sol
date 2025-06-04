@@ -238,9 +238,7 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 _slopeRate = 2000; // 20%
         uint256 _initialSupply = 100 ether;
 
-        OwnershipFacet(address(diamond)).initializeProtocolPool{
-            value: _initialSupply
-        }(
+        OwnershipFacet(address(diamond)).initializeProtocolPool(
             ETH_CONTRACT_ADDRESS,
             _reserveFactor,
             _optimalUtilization,

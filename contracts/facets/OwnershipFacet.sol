@@ -34,7 +34,7 @@ contract OwnershipFacet is IERC173, AppStorage {
         uint256 optimalUtilization,
         uint256 baseRate,
         uint256 slopeRate // uint256 initialSupply
-    ) external payable {
+    ) external {
         // Check caller is contract owner
         LibDiamond.enforceIsContractOwner();
 
