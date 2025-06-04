@@ -23,7 +23,8 @@ library LibShared {
         LibAppStorage.Layout storage _appStorage,
         address _tokenCollateralAddress,
         uint256 _amountOfCollateral,
-        address _user
+        address _user,
+        uint64 _chainSelector
     ) internal {
         // Validate the input parameters: `_amountOfCollateral` must be greater than zero,
         // and `_tokenCollateralAddress` must have a valid price feed (non-zero address).
@@ -64,7 +65,8 @@ library LibShared {
         emit CollateralDeposited(
             _user,
             _tokenCollateralAddress,
-            _amountOfCollateral
+            _amountOfCollateral,
+            _chainSelector
         );
     }
 
@@ -78,7 +80,8 @@ library LibShared {
         LibAppStorage.Layout storage _appStorage,
         address _tokenCollateralAddress,
         uint256 _amount,
-        address _user
+        address _user,
+        uint64 _chainSelector
     ) internal {
         // Validate that the token is allowed and the amount is greater than zero
         Validator._isTokenAllowed(
@@ -115,6 +118,11 @@ library LibShared {
         }
 
         // Emit an event indicating successful collateral withdrawal
-        emit CollateralWithdrawn(_user, _tokenCollateralAddress, _amount);
+        emit CollateralWithdrawn(
+            _user,
+            _tokenCollateralAddress,
+            _amount,
+            _chainSelector
+        );
     }
 }

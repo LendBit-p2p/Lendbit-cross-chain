@@ -30,7 +30,8 @@ contract SharedFacet is AppStorage {
         _appStorage._depositCollateral(
             _tokenCollateralAddress,
             _amountOfCollateral,
-            msg.sender
+            msg.sender,
+            Constants.CHAIN_SELECTOR
         );
     }
 
@@ -53,7 +54,8 @@ contract SharedFacet is AppStorage {
         _appStorage._withdrawCollateral(
             _tokenCollateralAddress,
             _amountOfCollateral,
-            msg.sender
+            msg.sender,
+            Constants.CHAIN_SELECTOR
         );
     }
 
