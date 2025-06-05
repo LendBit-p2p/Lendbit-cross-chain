@@ -1,35 +1,20 @@
-// SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity ^0.8.9;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
 
-import {Operations} from "../utils/functions/Operations.sol";
-import {LibGettersImpl} from "../libraries/LibGetters.sol";
-import {LibDiamond} from "../libraries/LibDiamond.sol";
-import {LibProtocol} from "../libraries/LibProtocol.sol";
-import {Validator} from "../utils/validators/Validator.sol";
-import {Constants} from "../utils/constants/Constant.sol";
-import {Utils} from "../utils/functions/Utils.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../interfaces/IUniswapV2Router02.sol";
-import "../utils/functions/AppStorage.sol";
+
+import {LibGettersImpl} from "../libraries/LibGetters.sol";
+import {Utils} from "../utils/functions/Utils.sol";
 import "../model/Protocol.sol";
 import "../model/Event.sol";
 import "../utils/validators/Error.sol";
+import "../utils/validators/Validator.sol";
+import "../utils/constants/Constant.sol";
+import "./LibAppStorage.sol";
 
-/**
- * @title ProtocolFacet
- * @author Lendbit Finance
- *
- * @dev Core contract of the Lending protocol that integrates operations and data access functions.
- * This contract combines essential functionalities from `Operations` and `Getters`, enabling
- * interactions with the protocol’s core features, such as loan requests and user information retrieval.
- *
- * This contract acts as a primary interface for protocol interactions, while `Operations`
- * contains core operational functions, and `Getters` allows querying data from the protocol.
- */
-contract ProtocolFacet is AppStorage {
+library LibShared {
     using SafeERC20 for IERC20;
-    using LibProtocol for LibAppStorage.Layout;
 
     /**
      * @dev Creates a new lending request by validating input parameters, calculating loanable amounts,
@@ -51,9 +36,13 @@ contract ProtocolFacet is AppStorage {
      * collateral, calculates the total repayment including interest, and stores loan request data.
      * Emits a `RequestCreated` event on successful request creation.
      */
-    function createLendingRequest(uint128 _amount, uint16 _interest, uint256 _returnDate, address _loanCurrency)
-        external
-    {
+    function _createLendingRequest(
+        LibAppStorage.Layout storage _appStorage,
+        uint128 _amount,
+        uint16 _interest,
+        uint256 _returnDate,
+        address _loanCurrency
+    ) internal {
         // Validate that the loan amount is greater than zero
         Validator._moreThanZero(_amount);
 
@@ -143,7 +132,10 @@ contract ProtocolFacet is AppStorage {
      *
      * Emits a `RequestServiced` event upon successful funding.
      */
-    function serviceRequest(uint96 _requestId, address _tokenAddress) external payable {
+    function _serviceRequest(LibAppStorage.Layout storage _appStorage, uint96 _requestId, address _tokenAddress)
+        internal
+    // payable
+    {
         // Validate if native token is being used and msg.value is non-zero
         Validator._nativeMoreThanZero(_tokenAddress, msg.value);
 
@@ -231,7 +223,7 @@ contract ProtocolFacet is AppStorage {
      *
      * Emits a `withdrawnAdsToken` event indicating the author, listing ID, status, and amount withdrawn.
      */
-    function closeListingAd(uint96 _listingId) external {
+    function _closeListingAd(LibAppStorage.Layout storage _appStorage, uint96 _listingId) internal {
         // Retrieve the loan listing associated with the given listing ID
         LoanListing storage _newListing = _appStorage.loanListings[_listingId];
 
@@ -277,7 +269,7 @@ contract ProtocolFacet is AppStorage {
      *
      * Emits a `RequestClosed` event indicating the request ID and the author of the request.
      */
-    function closeRequest(uint96 _requestId) external {
+    function _closeRequest(LibAppStorage.Layout storage _appStorage, uint96 _requestId) internal {
         // Retrieve the lending request associated with the given request ID
         Request storage _foundRequest = _appStorage.request[_requestId];
 
@@ -313,7 +305,8 @@ contract ProtocolFacet is AppStorage {
      *
      * Emits a `LoanListingCreated` event indicating the listing ID, author, and loan currency.
      */
-    function createLoanListing(
+    function _createLoanListing(
+        LibAppStorage.Layout storage _appStorage,
         uint256 _amount,
         uint256 _min_amount,
         uint256 _max_amount,
@@ -321,7 +314,9 @@ contract ProtocolFacet is AppStorage {
         uint16 _interest,
         address _loanCurrency,
         address[] memory _whitelist
-    ) external payable {
+    ) internal 
+    // payable
+    {
         // Validate that the amount is greater than zero and that a value has been sent if using native token
         Validator._valueMoreThanZero(_amount, _loanCurrency, msg.value);
         Validator._moreThanZero(_amount);
@@ -386,7 +381,9 @@ contract ProtocolFacet is AppStorage {
      * - `RequestCreated` when a loan request is successfully created.
      * - `RequestServiced` when the loan request is successfully serviced.
      */
-    function requestLoanFromListing(uint96 _listingId, uint256 _amount) public {
+    function _requestLoanFromListing(LibAppStorage.Layout storage _appStorage, uint96 _listingId, uint256 _amount)
+        internal
+    {
         Validator._moreThanZero(_amount);
 
         LoanListing storage _listing = _appStorage.loanListings[_listingId];
@@ -496,7 +493,9 @@ contract ProtocolFacet is AppStorage {
      * Emits:
      * - `LoanRepayment` upon successful repayment.
      */
-    function repayLoan(uint96 _requestId, uint256 _amount) external payable {
+    function _repayLoan(LibAppStorage.Layout storage _appStorage, uint96 _requestId, uint256 _amount) internal 
+    // payable
+    {
         Validator._moreThanZero(_amount);
 
         Request storage _request = _appStorage.request[_requestId];
@@ -538,7 +537,7 @@ contract ProtocolFacet is AppStorage {
             _request.totalRepayment -= _amount;
         }
 
-        (, uint256 _amountAfterFees) = _settleFees(_request.loanRequestAddr, _amount);
+        (, uint256 _amountAfterFees) = _settleFees(_appStorage, _request.loanRequestAddr, _amount);
 
         // Update borrower’s loan collected metrics in USD
         uint8 decimal = LibGettersImpl._getTokenDecimal(_request.loanRequestAddr);
@@ -561,7 +560,6 @@ contract ProtocolFacet is AppStorage {
         emit LoanRepayment(msg.sender, _requestId, _amount);
     }
 
-    // TODO: check the usefulness of this function and move to the appropriate facet
     // /**
     //  * @notice Liquidates an undercollateralized P2P loan and transfers assets
     //  * @dev This function performs the following actions:
@@ -572,114 +570,117 @@ contract ProtocolFacet is AppStorage {
     //  *      5. Sends liquidation fee to the protocol
     //  * @param requestId The unique identifier of the loan request to liquidate
     //  */
-    function liquidateUserRequest(uint96 requestId) external payable {
-        //     // Get the loan request from storage
-        //     Request storage request = _appStorage.request[requestId];
+    // function liquidateUserRequest(uint96 requestId) external payable {
+    //     // Get the loan request from storage
+    //     Request storage request = _appStorage.request[requestId];
 
-        //     // Verify loan is in active state
-        //     if (request.status != Status.SERVICED) {
-        //         revert Protocol__RequestNotServiced();
-        //     }
+    //     // Verify loan is in active state
+    //     if (request.status != Status.SERVICED) {
+    //         revert Protocol__RequestNotServiced();
+    //     }
 
-        //     if (request.author == msg.sender) {
-        //         revert Protocol__OwnerCantLiquidateRequest();
-        //     }
+    //     if (request.author == msg.sender) {
+    //         revert Protocol__OwnerCantLiquidateRequest();
+    //     }
 
-        //     // Store key loan details for easier reference and gas optimization
-        //     address borrower = request.author;
-        //     address lender = request.lender;
-        //     address loanToken = request.loanRequestAddr;
-        //     uint256 totalDebt = request.totalRepayment;
+    //     // Store key loan details for easier reference and gas optimization
+    //     address borrower = request.author;
+    //     address lender = request.lender;
+    //     address loanToken = request.loanRequestAddr;
+    //     uint256 totalDebt = request.totalRepayment;
 
-        //     // Calculate loan value in USD
-        //     uint8 loanTokenDecimal = LibGettersImpl._getTokenDecimal(loanToken);
-        //     uint256 loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, loanToken, totalDebt, loanTokenDecimal);
+    //     // Calculate loan value in USD
+    //     uint8 loanTokenDecimal = LibGettersImpl._getTokenDecimal(loanToken);
+    //     uint256 loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, loanToken, totalDebt, loanTokenDecimal);
 
-        //     // Calculate total value of collateral in USD
-        //     uint256 totalCollateralValue = 0;
-        //     for (uint256 i = 0; i < request.collateralTokens.length; i++) {
-        //         address collateralToken = request.collateralTokens[i];
-        //         uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[requestId][collateralToken];
+    //     // Calculate total value of collateral in USD
+    //     uint256 totalCollateralValue = 0;
+    //     for (uint256 i = 0; i < request.collateralTokens.length; i++) {
+    //         address collateralToken = request.collateralTokens[i];
+    //         uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[requestId][collateralToken];
 
-        //         if (collateralAmount > 0) {
-        //             uint8 collateralDecimal = LibGettersImpl._getTokenDecimal(collateralToken);
-        //             totalCollateralValue +=
-        //                 LibGettersImpl._getUsdValue(_appStorage, collateralToken, collateralAmount, collateralDecimal);
-        //         }
-        //     }
+    //         if (collateralAmount > 0) {
+    //             uint8 collateralDecimal = LibGettersImpl._getTokenDecimal(collateralToken);
+    //             totalCollateralValue +=
+    //                 LibGettersImpl._getUsdValue(_appStorage, collateralToken, collateralAmount, collateralDecimal);
+    //         }
+    //     }
 
-        //     // Check if loan is past due date (liquidation only allowed for overdue loans)
-        //     bool isPastDue = block.timestamp > request.returnDate;
-        //     // Verify loan is undercollateralized (health factor check)
-        //     // Health factor broken when loan value exceeds collateral value
-        //     bool isUnhealthy = loanUsdValue > totalCollateralValue;
-        //     if (!isPastDue || !isUnhealthy) revert Protocol__NotLiquidatable();
+    //     // Check if loan is past due date (liquidation only allowed for overdue loans)
+    //     bool isPastDue = block.timestamp > request.returnDate;
+    //     // Verify loan is undercollateralized (health factor check)
+    //     // Health factor broken when loan value exceeds collateral value
+    //     bool isUnhealthy = loanUsdValue > totalCollateralValue;
+    //     if (!isPastDue || !isUnhealthy) revert Protocol__NotLiquidatable();
 
-        //     // Update request status to prevent re-entrancy and multiple liquidations
-        //     request.status = Status.LIQUIDATED;
+    //     // Update request status to prevent re-entrancy and multiple liquidations
+    //     request.status = Status.LIQUIDATED;
 
-        //     // Handle debt repayment from liquidator to lender
-        //     if (loanToken == Constants.NATIVE_TOKEN) {
-        //         // For native token (ETH), ensure sufficient ETH was sent
-        //         if (msg.value < totalDebt) revert Protocol__InsufficientETH();
+    //     // Handle debt repayment from liquidator to lender
+    //     if (loanToken == Constants.NATIVE_TOKEN) {
+    //         // For native token (ETH), ensure sufficient ETH was sent
+    //         if (msg.value < totalDebt) revert Protocol__InsufficientETH();
 
-        //         // Refund excess ETH to liquidator
-        //         uint256 excess = msg.value - totalDebt;
-        //         if (excess > 0) {
-        //             (bool refundSent,) = payable(msg.sender).call{value: excess}("");
-        //             if (!refundSent) revert Protocol__RefundFailed();
-        //         }
+    //         // Refund excess ETH to liquidator
+    //         uint256 excess = msg.value - totalDebt;
+    //         if (excess > 0) {
+    //             (bool refundSent,) = payable(msg.sender).call{value: excess}("");
+    //             if (!refundSent) revert Protocol__RefundFailed();
+    //         }
 
-        //         // Transfer the debt amount to the lender
-        //         (bool lenderSent,) = payable(lender).call{value: totalDebt}("");
-        //         if (!lenderSent) revert Protocol__ETHTransferFailed();
-        //     } else {
-        //         // For ERC20 tokens, transfer from liquidator to lender
-        //         IERC20(loanToken).safeTransferFrom(msg.sender, lender, totalDebt);
-        //     }
+    //         // Transfer the debt amount to the lender
+    //         (bool lenderSent,) = payable(lender).call{value: totalDebt}("");
+    //         if (!lenderSent) revert Protocol__ETHTransferFailed();
+    //     } else {
+    //         // For ERC20 tokens, transfer from liquidator to lender
+    //         IERC20(loanToken).safeTransferFrom(msg.sender, lender, totalDebt);
+    //     }
 
-        //     // Process each collateral token and transfer to liquidator with discount
-        //     for (uint256 i = 0; i < request.collateralTokens.length; i++) {
-        //         address collateralToken = request.collateralTokens[i];
-        //         uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[requestId][collateralToken];
+    //     // Process each collateral token and transfer to liquidator with discount
+    //     for (uint256 i = 0; i < request.collateralTokens.length; i++) {
+    //         address collateralToken = request.collateralTokens[i];
+    //         uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[requestId][collateralToken];
 
-        //         if (collateralAmount > 0) {
-        //             // Calculate discounted amount (apply liquidation discount)
-        //             uint256 discountedAmount = (collateralAmount * (10000 - Constants.LIQUIDATION_DISCOUNT)) / 10000;
+    //         if (collateralAmount > 0) {
+    //             // Calculate discounted amount (apply liquidation discount)
+    //             uint256 discountedAmount = (collateralAmount * (10000 - Constants.LIQUIDATION_DISCOUNT)) / 10000;
 
-        //             // Transfer discounted amount to liquidator
-        //             if (collateralToken == Constants.NATIVE_TOKEN) {
-        //                 (bool sent,) = payable(msg.sender).call{value: discountedAmount}("");
-        //                 if (!sent) revert Protocol__ETHTransferFailed();
-        //             } else {
-        //                 IERC20(collateralToken).safeTransfer(msg.sender, discountedAmount);
-        //             }
+    //             // Transfer discounted amount to liquidator
+    //             if (collateralToken == Constants.NATIVE_TOKEN) {
+    //                 (bool sent,) = payable(msg.sender).call{value: discountedAmount}("");
+    //                 if (!sent) revert Protocol__ETHTransferFailed();
+    //             } else {
+    //                 IERC20(collateralToken).safeTransfer(msg.sender, discountedAmount);
+    //             }
 
-        //             // The difference between original collateral and discounted amount goes to protocol as fee
-        //             uint256 protocolAmount = collateralAmount - discountedAmount;
-        //             if (protocolAmount > 0 && _appStorage.s_protocolFeeRecipient != address(0)) {
-        //                 if (collateralToken == Constants.NATIVE_TOKEN) {
-        //                     (bool sent,) = payable(_appStorage.s_protocolFeeRecipient).call{value: protocolAmount}("");
-        //                     if (!sent) revert Protocol__ETHFeeTransferFailed();
-        //                 } else {
-        //                     IERC20(collateralToken).safeTransfer(_appStorage.s_protocolFeeRecipient, protocolAmount);
-        //                 }
-        //             }
+    //             // The difference between original collateral and discounted amount goes to protocol as fee
+    //             uint256 protocolAmount = collateralAmount - discountedAmount;
+    //             if (protocolAmount > 0 && _appStorage.s_protocolFeeRecipient != address(0)) {
+    //                 if (collateralToken == Constants.NATIVE_TOKEN) {
+    //                     (bool sent,) = payable(_appStorage.s_protocolFeeRecipient).call{value: protocolAmount}("");
+    //                     if (!sent) revert Protocol__ETHFeeTransferFailed();
+    //                 } else {
+    //                     IERC20(collateralToken).safeTransfer(_appStorage.s_protocolFeeRecipient, protocolAmount);
+    //                 }
+    //             }
 
-        //             // Reset collateral tracking to prevent double-spending
-        //             _appStorage.s_idToCollateralTokenAmount[requestId][collateralToken] = 0;
-        //         }
-        //     }
+    //             // Reset collateral tracking to prevent double-spending
+    //             _appStorage.s_idToCollateralTokenAmount[requestId][collateralToken] = 0;
+    //         }
+    //     }
 
-        //     // Update liquidator's activity metrics for potential rewards
-        //     User storage liquidator = _appStorage.addressToUser[msg.sender];
-        //     liquidator.totalLiquidationAmount += totalCollateralValue;
+    //     // Update liquidator's activity metrics for potential rewards
+    //     User storage liquidator = _appStorage.addressToUser[msg.sender];
+    //     liquidator.totalLiquidationAmount += totalCollateralValue;
 
-        //     // Emit event for off-chain tracking and transparency
-        //     emit RequestLiquidated(requestId, msg.sender, borrower, lender, totalCollateralValue);
-    }
+    //     // Emit event for off-chain tracking and transparency
+    //     emit RequestLiquidated(requestId, msg.sender, borrower, lender, totalCollateralValue);
+    // }
 
-    function _settleFees(address _token, uint256 _amount) internal returns (uint256, uint256) {
+    function _settleFees(LibAppStorage.Layout storage _appStorage, address _token, uint256 _amount)
+        internal
+        returns (uint256, uint256)
+    {
         uint16 _feeRate = _appStorage.feeRateBps;
 
         uint256 _fee = Utils.calculatePercentage(_amount, _feeRate);
