@@ -68,26 +68,10 @@ contract ProtocolTest is Test, IDiamondCut {
         liquidityPoolFacet = new LiquidityPoolFacet();
 
         //deploy mock tokens
-        (USDT_CONTRACT_ADDRESS, USDT_USD) = deployERC20ContractAndAddPriceFeed(
-            "USDT",
-            6,
-            1
-        );
-        (DAI_CONTRACT_ADDRESS, DAI_USD) = deployERC20ContractAndAddPriceFeed(
-            "DAI",
-            18,
-            1
-        );
-        (LINK_CONTRACT_ADDRESS, LINK_USD) = deployERC20ContractAndAddPriceFeed(
-            "LINK",
-            18,
-            10
-        );
-        (WETH_CONTRACT_ADDRESS, WETH_USD) = deployERC20ContractAndAddPriceFeed(
-            "WETH",
-            18,
-            2000
-        );
+        (USDT_CONTRACT_ADDRESS, USDT_USD) = deployERC20ContractAndAddPriceFeed("USDT", 6, 1);
+        (DAI_CONTRACT_ADDRESS, DAI_USD) = deployERC20ContractAndAddPriceFeed("DAI", 18, 1);
+        (LINK_CONTRACT_ADDRESS, LINK_USD) = deployERC20ContractAndAddPriceFeed("LINK", 18, 10);
+        (WETH_CONTRACT_ADDRESS, WETH_USD) = deployERC20ContractAndAddPriceFeed("WETH", 18, 2000);
 
         tokens.push(USDT_CONTRACT_ADDRESS);
         tokens.push(DAI_CONTRACT_ADDRESS);
@@ -166,26 +150,15 @@ contract ProtocolTest is Test, IDiamondCut {
     function testOnlyWhitelistedUserCanRequestLoan() public {
         _depositCollateral(C, ETH_CONTRACT_ADDRESS, 1e18);
         switchSigner(owner);
-        IERC20(DAI_CONTRACT_ADDRESS).approve(
-            address(protocolFacet),
-            type(uint256).max
-        );
+        IERC20(DAI_CONTRACT_ADDRESS).approve(address(protocolFacet), type(uint256).max);
         address[] memory whitelist = new address[](1);
         whitelist[0] = B;
         protocolFacet.createLoanListing(
-            10e10,
-            2e10,
-            10e10,
-            block.timestamp + 365 days,
-            500,
-            DAI_CONTRACT_ADDRESS,
-            whitelist
+            10e10, 2e10, 10e10, block.timestamp + 365 days, 500, DAI_CONTRACT_ADDRESS, whitelist
         );
 
         switchSigner(C);
-        vm.expectRevert(
-            abi.encodeWithSelector(Protocol__NotWhitelisted.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Protocol__NotWhitelisted.selector));
         protocolFacet.requestLoanFromListing(1, 5e10);
     }
 
@@ -202,23 +175,10 @@ contract ProtocolTest is Test, IDiamondCut {
         // uint256 _initialSupply = 100 ether;
 
         OwnershipFacet(address(diamond)).initializeProtocolPool(
-            DAI_CONTRACT_ADDRESS,
-            _reserveFactor,
-            _optimalUtilization,
-            _baseRate,
-            _slopeRate
+            DAI_CONTRACT_ADDRESS, _reserveFactor, _optimalUtilization, _baseRate, _slopeRate
         );
-        (
-            address token,
-            ,
-            ,
-            uint256 reserveFactor,
-            uint256 optimalUtilization,
-            ,
-            ,
-            bool isActive,
-
-        ) = liquidityPoolFacet.getProtocolPoolConfig(DAI_CONTRACT_ADDRESS);
+        (address token,,, uint256 reserveFactor, uint256 optimalUtilization,,, bool isActive,) =
+            liquidityPoolFacet.getProtocolPoolConfig(DAI_CONTRACT_ADDRESS);
 
         assertEq(token, DAI_CONTRACT_ADDRESS);
         assertEq(_reserveFactor, reserveFactor);
@@ -239,23 +199,10 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 _initialSupply = 100 ether;
 
         OwnershipFacet(address(diamond)).initializeProtocolPool(
-            ETH_CONTRACT_ADDRESS,
-            _reserveFactor,
-            _optimalUtilization,
-            _baseRate,
-            _slopeRate
+            ETH_CONTRACT_ADDRESS, _reserveFactor, _optimalUtilization, _baseRate, _slopeRate
         );
-        (
-            address token,
-            ,
-            ,
-            uint256 reserveFactor,
-            uint256 optimalUtilization,
-            ,
-            ,
-            bool isActive,
-
-        ) = liquidityPoolFacet.getProtocolPoolConfig(ETH_CONTRACT_ADDRESS);
+        (address token,,, uint256 reserveFactor, uint256 optimalUtilization,,, bool isActive,) =
+            liquidityPoolFacet.getProtocolPoolConfig(ETH_CONTRACT_ADDRESS);
 
         assertEq(token, ETH_CONTRACT_ADDRESS);
         assertEq(_reserveFactor, reserveFactor);
@@ -317,11 +264,7 @@ contract ProtocolTest is Test, IDiamondCut {
     //     assertEq(shares, amount);
     // }
 
-    function _mintTokenToAddress(
-        address _token,
-        address _to,
-        uint256 _amount
-    ) internal {
+    function _mintTokenToAddress(address _token, address _to, uint256 _amount) internal {
         ERC20Mock(_token).mint(_to, _amount);
     }
 
@@ -777,42 +720,24 @@ contract ProtocolTest is Test, IDiamondCut {
 
         liquidityPoolFacet.deposit(DAI_CONTRACT_ADDRESS, 100 ether);
 
-        uint256 poolDeposit = liquidityPoolFacet.getUserPoolDeposit(
-            owner,
-            DAI_CONTRACT_ADDRESS
-        );
+        uint256 poolDeposit = liquidityPoolFacet.getUserPoolDeposit(owner, DAI_CONTRACT_ADDRESS);
         assertEq(poolDeposit, 100 ether);
 
-        (, uint256 poolLiquidity, , ) = liquidityPoolFacet.getPoolTokenData(
-            DAI_CONTRACT_ADDRESS
-        );
+        (, uint256 poolLiquidity,,) = liquidityPoolFacet.getPoolTokenData(DAI_CONTRACT_ADDRESS);
 
-        assertEq(
-            poolLiquidity,
-            DEPOSIT_AMOUNT,
-            "Pool liquidity should be 100 dia"
-        );
+        assertEq(poolLiquidity, DEPOSIT_AMOUNT, "Pool liquidity should be 100 dia");
 
         switchSigner(B);
-        IERC20(DAI_CONTRACT_ADDRESS).approve(
-            address(liquidityPoolFacet),
-            200 ether
-        );
+        IERC20(DAI_CONTRACT_ADDRESS).approve(address(liquidityPoolFacet), 200 ether);
 
         liquidityPoolFacet.deposit(DAI_CONTRACT_ADDRESS, 100 ether);
 
-        uint256 poolDeposit_2 = liquidityPoolFacet.getUserPoolDeposit(
-            B,
-            DAI_CONTRACT_ADDRESS
-        );
+        uint256 poolDeposit_2 = liquidityPoolFacet.getUserPoolDeposit(B, DAI_CONTRACT_ADDRESS);
 
         assertEq(poolDeposit_2, 100 ether);
 
         // Get user's shares after deposit
-        uint256 userShares = liquidityPoolFacet.getUserPoolDeposit(
-            B,
-            DAI_CONTRACT_ADDRESS
-        );
+        uint256 userShares = liquidityPoolFacet.getUserPoolDeposit(B, DAI_CONTRACT_ADDRESS);
         assertGt(userShares, 0, "User should have shares after deposit");
 
         // Get initial token balance before withdrawal
@@ -821,10 +746,7 @@ contract ProtocolTest is Test, IDiamondCut {
         // Withdraw all shares
         liquidityPoolFacet.withdraw(DAI_CONTRACT_ADDRESS, userShares);
 
-        uint256 sharesafterWithdrawn = liquidityPoolFacet.getUserPoolDeposit(
-            B,
-            DAI_CONTRACT_ADDRESS
-        );
+        uint256 sharesafterWithdrawn = liquidityPoolFacet.getUserPoolDeposit(B, DAI_CONTRACT_ADDRESS);
         assertEq(sharesafterWithdrawn, 0, "All shares should be withdrawn");
     }
 
@@ -839,42 +761,24 @@ contract ProtocolTest is Test, IDiamondCut {
 
         liquidityPoolFacet.deposit(DAI_CONTRACT_ADDRESS, 100 ether);
 
-        uint256 poolDeposit = liquidityPoolFacet.getUserPoolDeposit(
-            owner,
-            DAI_CONTRACT_ADDRESS
-        );
+        uint256 poolDeposit = liquidityPoolFacet.getUserPoolDeposit(owner, DAI_CONTRACT_ADDRESS);
         assertEq(poolDeposit, 100 ether);
 
-        (, uint256 poolLiquidity, , ) = liquidityPoolFacet.getPoolTokenData(
-            DAI_CONTRACT_ADDRESS
-        );
+        (, uint256 poolLiquidity,,) = liquidityPoolFacet.getPoolTokenData(DAI_CONTRACT_ADDRESS);
 
-        assertEq(
-            poolLiquidity,
-            DEPOSIT_AMOUNT,
-            "Pool liquidity should be 100 dia"
-        );
+        assertEq(poolLiquidity, DEPOSIT_AMOUNT, "Pool liquidity should be 100 dia");
 
         switchSigner(B);
-        IERC20(DAI_CONTRACT_ADDRESS).approve(
-            address(liquidityPoolFacet),
-            200 ether
-        );
+        IERC20(DAI_CONTRACT_ADDRESS).approve(address(liquidityPoolFacet), 200 ether);
 
         liquidityPoolFacet.deposit(DAI_CONTRACT_ADDRESS, DEPOSIT_AMOUNT);
 
-        uint256 poolDeposit_2 = liquidityPoolFacet.getUserPoolDeposit(
-            B,
-            DAI_CONTRACT_ADDRESS
-        );
+        uint256 poolDeposit_2 = liquidityPoolFacet.getUserPoolDeposit(B, DAI_CONTRACT_ADDRESS);
 
         assertEq(poolDeposit_2, 100 ether);
 
         // Get user's shares after deposit
-        uint256 userShares = liquidityPoolFacet.getUserPoolDeposit(
-            B,
-            DAI_CONTRACT_ADDRESS
-        );
+        uint256 userShares = liquidityPoolFacet.getUserPoolDeposit(B, DAI_CONTRACT_ADDRESS);
         assertGt(userShares, 0, "User should have shares after deposit");
 
         // Get initial token balance before withdrawal
@@ -884,57 +788,32 @@ contract ProtocolTest is Test, IDiamondCut {
         // Withdraw all shares
         liquidityPoolFacet.withdraw(DAI_CONTRACT_ADDRESS, withdrawnHalfAmount);
 
-        uint256 sharesafterWithdrawn = liquidityPoolFacet.getUserPoolDeposit(
-            B,
-            DAI_CONTRACT_ADDRESS
-        );
-        assertEq(
-            sharesafterWithdrawn,
-            DEPOSIT_AMOUNT - withdrawnHalfAmount,
-            "half shares should be withdrawn"
-        );
+        uint256 sharesafterWithdrawn = liquidityPoolFacet.getUserPoolDeposit(B, DAI_CONTRACT_ADDRESS);
+        assertEq(sharesafterWithdrawn, DEPOSIT_AMOUNT - withdrawnHalfAmount, "half shares should be withdrawn");
     }
 
-    function _depositCollateral(
-        address user,
-        address token,
-        uint256 amount
-    ) internal {
+    function _depositCollateral(address user, address token, uint256 amount) internal {
         switchSigner(user);
         if (token == ETH_CONTRACT_ADDRESS) {
             vm.deal(user, amount);
-            SharedFacet(address(diamond)).depositCollateral{value: amount}(
-                token,
-                amount
-            );
+            SharedFacet(address(diamond)).depositCollateral{value: amount}(token, amount);
             return;
         }
         IERC20(token).approve(address(protocolFacet), type(uint256).max);
         SharedFacet(address(diamond)).depositCollateral(token, amount);
     }
 
-    function _withdrawCollateral(
-        address user,
-        address token,
-        uint256 amount
-    ) internal {
+    function _withdrawCollateral(address user, address token, uint256 amount) internal {
         switchSigner(user);
-        SharedFacet(address(diamond)).withdrawCollateral(
-            token,
-            uint128(amount)
-        );
+        SharedFacet(address(diamond)).withdrawCollateral(token, uint128(amount));
     }
 
-    function deployERC20ContractAndAddPriceFeed(
-        string memory _name,
-        uint8 _decimals,
-        int256 _initialAnswer
-    ) internal returns (address, address) {
+    function deployERC20ContractAndAddPriceFeed(string memory _name, uint8 _decimals, int256 _initialAnswer)
+        internal
+        returns (address, address)
+    {
         ERC20Mock _erc20 = new ERC20Mock();
-        MockV3Aggregator _priceFeed = new MockV3Aggregator(
-            _decimals,
-            _initialAnswer * 1e8
-        );
+        MockV3Aggregator _priceFeed = new MockV3Aggregator(_decimals, _initialAnswer * 1e8);
         vm.label(address(_priceFeed), "Price Feed");
         vm.label(address(_erc20), _name);
         return (address(_erc20), address(_priceFeed));
@@ -951,11 +830,7 @@ contract ProtocolTest is Test, IDiamondCut {
         IERC20(_token).approve(address(protocolFacet), type(uint256).max);
 
         OwnershipFacet(address(diamond)).initializeProtocolPool(
-            _token,
-            _reserveFactor,
-            _optimalUtilization,
-            _baseRate,
-            _slopeRate
+            _token, _reserveFactor, _optimalUtilization, _baseRate, _slopeRate
         );
     }
 
@@ -971,24 +846,15 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 poolLiquidity = 100 ether;
 
         // Calculate APR
-        uint256 poolApr = liquidityPoolFacet.calculatePoolAPR(
-            _baseRate,
-            _slopeRate,
-            _optimalUtilization,
-            totalBorrows,
-            poolLiquidity
-        );
+        uint256 poolApr =
+            liquidityPoolFacet.calculatePoolAPR(_baseRate, _slopeRate, _optimalUtilization, totalBorrows, poolLiquidity);
 
         // Expected APR at 30% utilization (below 80% optimal):
         // baseRate + (slopeRate * utilization / optimalUtilization)
         // 500 + (2000 * 3000 / 8000) = 500 + 750 = 1250 (12.5%)
         uint256 expectedApr = 1250; // 12.5%
 
-        assertEq(
-            poolApr,
-            expectedApr,
-            "APR calculation incorrect for normal utilization"
-        );
+        assertEq(poolApr, expectedApr, "APR calculation incorrect for normal utilization");
     }
 
     // Test function for high utilization (above optimal)
@@ -1003,24 +869,15 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 poolLiquidity = 100 ether;
 
         // Calculate APR
-        uint256 poolApr = liquidityPoolFacet.calculatePoolAPR(
-            _baseRate,
-            _slopeRate,
-            _optimalUtilization,
-            totalBorrows,
-            poolLiquidity
-        );
+        uint256 poolApr =
+            liquidityPoolFacet.calculatePoolAPR(_baseRate, _slopeRate, _optimalUtilization, totalBorrows, poolLiquidity);
 
         // Expected APR at 90% utilization (above 80% optimal):
         // baseRate + slopeRate + (slopeRate * 2 * excessUtilization / maxExcessUtilization)
         // 500 + 2000 + (2000 * 2 * (9000-8000) / (10000-8000)) = 2500 + 2000 = 4500 (45%)
         uint256 expectedApr = 4500; // 45%
 
-        assertEq(
-            poolApr,
-            expectedApr,
-            "APR calculation incorrect for high utilization"
-        );
+        assertEq(poolApr, expectedApr, "APR calculation incorrect for high utilization");
     }
 
     // Test function for low utilization
@@ -1035,24 +892,15 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 poolLiquidity = 100 ether;
 
         // Calculate APR
-        uint256 poolApr = liquidityPoolFacet.calculatePoolAPR(
-            _baseRate,
-            _slopeRate,
-            _optimalUtilization,
-            totalBorrows,
-            poolLiquidity
-        );
+        uint256 poolApr =
+            liquidityPoolFacet.calculatePoolAPR(_baseRate, _slopeRate, _optimalUtilization, totalBorrows, poolLiquidity);
 
         // Expected APR at 10% utilization:
         // baseRate + (slopeRate * utilization / optimalUtilization)
         // 500 + (2000 * 1000 / 8000) = 500 + 250 = 750 (7.5%)
         uint256 expectedApr = 750; // 7.5%
 
-        assertEq(
-            poolApr,
-            expectedApr,
-            "APR calculation incorrect for low utilization"
-        );
+        assertEq(poolApr, expectedApr, "APR calculation incorrect for low utilization");
     }
 
     // Test function for APY calculation
@@ -1061,10 +909,7 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 compoundingPeriods = 12; // Monthly compounding
 
         // Calculate APY
-        uint256 apy = liquidityPoolFacet.calculatePoolAPY(
-            apr,
-            compoundingPeriods
-        );
+        uint256 apy = liquidityPoolFacet.calculatePoolAPY(apr, compoundingPeriods);
 
         // Expected APY with 10% APR compounded monthly:
         // (1 + 0.10/12)^12 - 1 ≈ 10.47%
@@ -1082,14 +927,8 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 apyWeekly = liquidityPoolFacet.calculatePoolAPY(apr, 52); // Weekly compounding
 
         // Check APY increases with more frequent compounding
-        assertTrue(
-            apyDaily > apyWeekly,
-            "Daily compounding should yield higher APY than weekly"
-        );
-        assertTrue(
-            apyWeekly > apyMonthly,
-            "Weekly compounding should yield higher APY than monthly"
-        );
+        assertTrue(apyDaily > apyWeekly, "Daily compounding should yield higher APY than weekly");
+        assertTrue(apyWeekly > apyMonthly, "Weekly compounding should yield higher APY than monthly");
     }
 
     // Test function to check both APR and APY are calculated correctly
@@ -1104,13 +943,8 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 poolLiquidity = 100 ether;
 
         // Get both APR and APY
-        (uint256 apr, uint256 apy) = liquidityPoolFacet.getRatesFromPool(
-            _baseRate,
-            _slopeRate,
-            _optimalUtilization,
-            totalBorrows,
-            poolLiquidity
-        );
+        (uint256 apr, uint256 apy) =
+            liquidityPoolFacet.getRatesFromPool(_baseRate, _slopeRate, _optimalUtilization, totalBorrows, poolLiquidity);
 
         // Expected APR at 40% utilization:
         // baseRate + (slopeRate * utilization / optimalUtilization)
@@ -1118,15 +952,10 @@ contract ProtocolTest is Test, IDiamondCut {
         uint256 expectedApr = 1500; // 15%
 
         assertEq(apr, expectedApr, "APR calculation incorrect in getRates");
-        assertTrue(
-            apy > apr,
-            "APY should be greater than APR due to compounding"
-        );
+        assertTrue(apy > apr, "APY should be greater than APR due to compounding");
     }
 
-    function generateSelectors(
-        string memory _facetName
-    ) internal returns (bytes4[] memory selectors) {
+    function generateSelectors(string memory _facetName) internal returns (bytes4[] memory selectors) {
         string[] memory cmd = new string[](3);
         cmd[0] = "node";
         cmd[1] = "scripts/genSelectors.js";
@@ -1136,9 +965,7 @@ contract ProtocolTest is Test, IDiamondCut {
     }
 
     function mkaddr(string memory name) public returns (address) {
-        address addr = address(
-            uint160(uint256(keccak256(abi.encodePacked(name))))
-        );
+        address addr = address(uint160(uint256(keccak256(abi.encodePacked(name)))));
         vm.label(addr, name);
         return addr;
     }
@@ -1153,9 +980,5 @@ contract ProtocolTest is Test, IDiamondCut {
         }
     }
 
-    function diamondCut(
-        FacetCut[] calldata _diamondCut,
-        address _init,
-        bytes calldata _calldata
-    ) external override {}
+    function diamondCut(FacetCut[] calldata _diamondCut, address _init, bytes calldata _calldata) external override {}
 }

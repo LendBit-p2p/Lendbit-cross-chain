@@ -2,85 +2,46 @@
 pragma solidity ^0.8.20;
 
 event RequestCreated(
-    address indexed _borrower,
-    uint96 indexed requestId,
-    uint256 _amount,
-    uint16 _interest
+    address indexed _borrower, uint96 indexed requestId, uint256 _amount, uint16 _interest, uint64 _chainSelector
 );
 
-event OrderCreated(
-    address indexed _lender,
-    address indexed_tokenAddress,
-    uint256 _amount,
-    uint96 indexed _requestId
-);
+event OrderCreated(address indexed _lender, address indexed_tokenAddress, uint256 _amount, uint96 indexed _requestId);
 
-event RespondToLendingOffer(
-    address indexed sender,
-    uint256 indexed _offerId,
-    uint8 _status,
-    uint8 _offerStatus
-);
+event RespondToLendingOffer(address indexed sender, uint256 indexed _offerId, uint8 _status, uint8 _offerStatus);
 
 event RequestServiced(
     uint96 indexed _requestId,
     address indexed _lender,
     address indexed _borrower,
-    uint256 _amount
-);
-
-event RequestClosed(uint96 indexed _requestId, address indexed _borrower);
-
-event CollateralWithdrawn(
-    address indexed sender,
-    address indexed _tokenCollateralAddress,
     uint256 _amount,
     uint64 _chainSelector
 );
 
+event RequestClosed(uint96 indexed _requestId, address indexed _borrower, uint64 _chainSelector);
+
+event CollateralWithdrawn(
+    address indexed sender, address indexed _tokenCollateralAddress, uint256 _amount, uint64 _chainSelector
+);
+
 event UpdatedCollateralTokens(address indexed sender, uint8 newTokensCount);
 
-event AcceptedListedAds(
-    address indexed sender,
-    uint96 indexed id,
-    uint256 indexed amount,
-    uint8 adStatus
-);
+event AcceptedListedAds(address indexed sender, uint96 indexed id, uint256 indexed amount, uint8 adStatus);
 
-event LoanRepayment(address indexed sender, uint96 id, uint256 amount);
+event LoanRepayment(address indexed sender, uint96 id, uint256 amount, uint64 chainSelector);
 
-event UpdateLoanableToken(
-    address indexed _token,
-    address _priceFeed,
-    address indexed sender
-);
+event UpdateLoanableToken(address indexed _token, address _priceFeed, address indexed sender);
 
-event CollateralDeposited(
-    address indexed _sender,
-    address indexed _token,
-    uint256 _value,
-    uint64 _chainSelector
-);
+event CollateralDeposited(address indexed _sender, address indexed _token, uint256 _value, uint64 _chainSelector);
 
 event withdrawnAdsToken(
-    address indexed sender,
-    uint96 indexed _orderId,
-    uint8 indexed orderStatus,
-    uint256 _amount
+    address indexed sender, uint96 indexed _orderId, uint8 indexed orderStatus, uint256 _amount, uint64 _chainSelector
 );
 
 event LoanListingCreated(
-    uint96 indexed listingId,
-    address indexed sender,
-    address indexed tokenAddress,
-    uint256 amount
+    uint96 indexed listingId, address indexed sender, address indexed tokenAddress, uint256 amount, uint64 chainSelector
 );
 
-event RequestLiquidated(
-    uint96 indexed requestId,
-    address indexed lenderAddress,
-    uint256 indexed totalRepayment
-);
+event RequestLiquidated(uint96 indexed requestId, address indexed lenderAddress, uint256 indexed totalRepayment);
 
 event FeesWithdrawn(address indexed to, address indexed token, uint256 amount);
 
@@ -123,12 +84,7 @@ event Deposit(
  * @param amount The amount of tokens withdrawn
  * @param sharesBurned The amount of LP shares burned
  */
-event Withdraw(
-    address indexed user,
-    address indexed token,
-    uint256 amount,
-    uint256 sharesBurned
-);
+event Withdraw(address indexed user, address indexed token, uint256 amount, uint256 sharesBurned);
 
 /**
  * @notice Emitted when interest is accrued in a pool
