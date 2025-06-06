@@ -9,6 +9,7 @@ import "../utils/validators/Error.sol";
 import "../utils/validators/Validator.sol";
 import "../utils/constants/Constant.sol";
 import "./LibAppStorage.sol";
+import {LibGettersImpl} from "../libraries/LibGetters.sol";
 
 library LibShared {
     using SafeERC20 for IERC20;
@@ -122,6 +123,173 @@ library LibShared {
             _user,
             _tokenCollateralAddress,
             _amount,
+            _chainSelector
+        );
+    }
+
+    /**
+     * @dev Allows a user to liquidate a LP.
+     * @param _borrowIndex The index of the borrow in the LP.
+     * @param _user The address of the user liquidating the collateral.
+     * @param _chainSelector The chain selector of the chain the request is on.
+     */
+    function _liquidateLp(
+        LibAppStorage.Layout storage _appStorage,
+        uint96 _borrowIndex,
+        address _user,
+        uint64 _chainSelector
+    ) internal {
+        //TODO: Implement the liquidation logic
+    }
+
+    /**
+     * @dev Allows a user to liquidate a request.
+     * @param _requestId The ID of the request to liquidate.
+     * @param _user The address of the user liquidating the collateral.
+     * @param _chainSelector The chain selector of the chain the request is on.
+     */
+    function _liquidateRequest(
+        LibAppStorage.Layout storage _appStorage,
+        uint96 _requestId,
+        address _user,
+        uint64 _chainSelector
+    ) internal {
+        Request storage request = _appStorage.request[_requestId];
+
+        if (request.status != Status.SERVICED) {
+            revert Protocol__RequestNotServiced();
+        }
+
+        if (request.author == _user) {
+            revert Protocol__OwnerCantLiquidateRequest();
+        }
+
+        // Store key loan details for easier reference and gas optimization
+        address borrower = request.author;
+        address lender = request.lender;
+        address loanToken = request.loanRequestAddr;
+        uint256 totalDebt = request.totalRepayment;
+
+        // Calculate loan value in USD
+        uint8 loanTokenDecimal = LibGettersImpl._getTokenDecimal(loanToken);
+        uint256 loanUsdValue = LibGettersImpl._getUsdValue(
+            _appStorage,
+            loanToken,
+            totalDebt,
+            loanTokenDecimal
+        );
+
+        // Calculate total value of collateral in USD
+        uint256 totalCollateralValue = 0;
+        for (uint256 i = 0; i < request.collateralTokens.length; i++) {
+            address collateralToken = request.collateralTokens[i];
+            uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[
+                _requestId
+            ][collateralToken];
+
+            if (collateralAmount > 0) {
+                uint8 collateralDecimal = LibGettersImpl._getTokenDecimal(
+                    collateralToken
+                );
+                totalCollateralValue += LibGettersImpl._getUsdValue(
+                    _appStorage,
+                    collateralToken,
+                    collateralAmount,
+                    collateralDecimal
+                );
+            }
+        }
+
+        // Check if loan is past due date (liquidation only allowed for overdue loans)
+        bool isPastDue = block.timestamp > request.returnDate;
+        // Verify loan is undercollateralized (health factor check)
+        // Health factor broken when loan value exceeds collateral value
+        bool isUnhealthy = loanUsdValue > totalCollateralValue;
+        if (!isPastDue || !isUnhealthy) revert Protocol__NotLiquidatable();
+
+        // Update request status to prevent re-entrancy and multiple liquidations
+        request.status = Status.LIQUIDATED;
+
+        // Handle debt repayment from liquidator to lender
+        if (loanToken == Constants.NATIVE_TOKEN) {
+            // For native token (ETH), ensure sufficient ETH was sent
+            if (msg.value < totalDebt) revert Protocol__InsufficientETH();
+
+            // Refund excess ETH to liquidator
+            uint256 excess = msg.value - totalDebt;
+            if (excess > 0) {
+                (bool refundSent, ) = payable(_user).call{value: excess}("");
+                if (!refundSent) revert Protocol__RefundFailed();
+            }
+
+            // Transfer the debt amount to the lender
+            (bool lenderSent, ) = payable(lender).call{value: totalDebt}("");
+            if (!lenderSent) revert Protocol__ETHTransferFailed();
+        } else {
+            // For ERC20 tokens, transfer from liquidator to lender
+            IERC20(loanToken).safeTransferFrom(_user, lender, totalDebt);
+        }
+
+        // Process each collateral token and transfer to liquidator with discount
+        for (uint256 i = 0; i < request.collateralTokens.length; i++) {
+            address collateralToken = request.collateralTokens[i];
+            uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[
+                _requestId
+            ][collateralToken];
+
+            if (collateralAmount > 0) {
+                // Calculate discounted amount (apply liquidation discount)
+                uint256 discountedAmount = (collateralAmount *
+                    (10000 - Constants.LIQUIDATION_DISCOUNT)) / 10000;
+
+                // Transfer discounted amount to liquidator
+                if (collateralToken == Constants.NATIVE_TOKEN) {
+                    (bool sent, ) = payable(_user).call{
+                        value: discountedAmount
+                    }("");
+                    if (!sent) revert Protocol__ETHTransferFailed();
+                } else {
+                    IERC20(collateralToken).safeTransfer(
+                        _user,
+                        discountedAmount
+                    );
+                }
+
+                // The difference between original collateral and discounted amount goes to protocol as fee
+                uint256 protocolAmount = collateralAmount - discountedAmount;
+                if (
+                    protocolAmount > 0 &&
+                    _appStorage.s_protocolFeeRecipient != address(0)
+                ) {
+                    if (collateralToken == Constants.NATIVE_TOKEN) {
+                        (bool sent, ) = payable(
+                            _appStorage.s_protocolFeeRecipient
+                        ).call{value: protocolAmount}("");
+                        if (!sent) revert Protocol__ETHFeeTransferFailed();
+                    } else {
+                        IERC20(collateralToken).safeTransfer(
+                            _appStorage.s_protocolFeeRecipient,
+                            protocolAmount
+                        );
+                    }
+                }
+
+                // Reset collateral tracking to prevent double-spending
+                _appStorage.s_idToCollateralTokenAmount[_requestId][
+                    collateralToken
+                ] = 0;
+            }
+        }
+
+        // Update liquidator's activity metrics for potential rewards
+        User storage liquidator = _appStorage.addressToUser[_user];
+        liquidator.totalLiquidationAmount += totalCollateralValue;
+
+        // Emit event for off-chain tracking and transparency
+        emit RequestLiquidated(
+            _requestId,
+            _user,
+            totalCollateralValue,
             _chainSelector
         );
     }

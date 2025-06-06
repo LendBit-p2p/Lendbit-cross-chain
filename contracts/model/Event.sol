@@ -94,7 +94,8 @@ event LoanListingCreated(
 event RequestLiquidated(
     uint96 indexed requestId,
     address indexed lenderAddress,
-    uint256 indexed totalRepayment
+    uint256 indexed totalRepayment,
+    uint64 chainSelector
 );
 
 event FeesWithdrawn(address indexed to, address indexed token, uint256 amount);
