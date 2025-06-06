@@ -119,3 +119,19 @@ enum ListingStatus {
     OPEN,
     CLOSED
 }
+
+//enum for the CCIP message type
+enum CCIPMessageType {
+    DEPOSIT,
+    DEPOSIT_COLLATERAL,
+    WITHDRAW,
+    WITHDRAW_COLLATERAL,
+    BORROW,
+    CREATE_REQUEST,
+    SERVICE_REQUEST,
+    CREATE_LISTING,
+    BORROW_FROM_LISTING,
+    REPAY,
+    REPAY_LOAN,
+    LIQUIDATE
+}
