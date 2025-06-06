@@ -49,7 +49,7 @@ library LibAppStorage {
         ///@dev for checking if the sender address is of the supported chain
         mapping(uint64 => address) s_senderSupported;
         ///@dev for checking if the message is already consumed
-        mapping(uint64 => bool) s_messageConsumed;
+        mapping(bytes32 => bool) s_messageConsumed;
         ///@dev Liquidity PoolConfig
         address s_protocolFeeRecipient;
         bool isProtocolPoolActive;

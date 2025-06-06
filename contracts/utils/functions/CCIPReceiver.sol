@@ -38,7 +38,11 @@ abstract contract CCIPReceiver is AppStorage, IAny2EVMMessageReceiver, IERC165 {
         virtual
         override
         onlyRouter
-        onlySupportedChain(message.sourceChainSelector, message.sender)
+        onlySupportedChain(
+            message.sourceChainSelector,
+            message.sender,
+            message.messageId
+        )
     {
         _ccipReceive(message);
     }
@@ -58,6 +62,7 @@ abstract contract CCIPReceiver is AppStorage, IAny2EVMMessageReceiver, IERC165 {
     error InvalidRouter(address router);
     error ChainSelectorNotSupported(uint64 chainSelector);
     error SenderNotSupported(address sender);
+    error MessageAlreadyConsumed(bytes32 messageId);
 
     /// @dev only calls from the set router are accepted.
     modifier onlyRouter() {
@@ -66,13 +71,19 @@ abstract contract CCIPReceiver is AppStorage, IAny2EVMMessageReceiver, IERC165 {
     }
 
     /// @dev only calls from the supported chain and sender are accepted.
-    modifier onlySupportedChain(uint64 _chainSelector, bytes calldata _sender) {
+    modifier onlySupportedChain(
+        uint64 _chainSelector,
+        bytes calldata _sender,
+        bytes32 _messageId
+    ) {
         address sender = abi.decode(_sender, (address));
 
         if (!_appStorage.s_chainSelectorSupported[_chainSelector])
             revert ChainSelectorNotSupported(_chainSelector);
         if (_appStorage.s_senderSupported[_chainSelector] != sender)
             revert SenderNotSupported(sender);
+        if (_appStorage.s_messageConsumed[_messageId])
+            revert MessageAlreadyConsumed(_messageId);
         _;
     }
 }

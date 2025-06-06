@@ -53,5 +53,6 @@ contract CcipFacet is CCIPReceiver {
             message.sender,
             message.destTokenAmounts
         );
+        _appStorage.s_messageConsumed[message.messageId] = true;
     }
 }
