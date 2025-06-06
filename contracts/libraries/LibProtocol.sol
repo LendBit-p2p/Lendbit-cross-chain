@@ -13,7 +13,7 @@ import "../utils/validators/Validator.sol";
 import "../utils/constants/Constant.sol";
 import "./LibAppStorage.sol";
 
-library LibShared {
+library LibProtocol {
     using SafeERC20 for IERC20;
 
     /**
@@ -41,7 +41,8 @@ library LibShared {
         uint128 _amount,
         uint16 _interest,
         uint256 _returnDate,
-        address _loanCurrency
+        address _loanCurrency,
+        uint64 _chainSelector
     ) internal {
         // Validate that the loan amount is greater than zero
         Validator._moreThanZero(_amount);
@@ -116,7 +117,7 @@ library LibShared {
         }
 
         // Emit an event for the created loan request
-        emit RequestCreated(msg.sender, _appStorage.requestId, _amount, _interest);
+        emit RequestCreated(msg.sender, _appStorage.requestId, _amount, _interest, _chainSelector);
     }
 
     /**
@@ -132,8 +133,12 @@ library LibShared {
      *
      * Emits a `RequestServiced` event upon successful funding.
      */
-    function _serviceRequest(LibAppStorage.Layout storage _appStorage, uint96 _requestId, address _tokenAddress)
-        internal
+    function _serviceRequest(
+        LibAppStorage.Layout storage _appStorage,
+        uint96 _requestId,
+        address _tokenAddress,
+        uint64 _chainSelector
+    ) internal 
     // payable
     {
         // Validate if native token is being used and msg.value is non-zero
@@ -209,7 +214,7 @@ library LibShared {
         }
 
         // Emit an event indicating successful servicing of the request
-        emit RequestServiced(_requestId, msg.sender, _foundRequest.author, amountToLend);
+        emit RequestServiced(_requestId, msg.sender, _foundRequest.author, amountToLend, _chainSelector);
     }
 
     /**
@@ -223,7 +228,9 @@ library LibShared {
      *
      * Emits a `withdrawnAdsToken` event indicating the author, listing ID, status, and amount withdrawn.
      */
-    function _closeListingAd(LibAppStorage.Layout storage _appStorage, uint96 _listingId) internal {
+    function _closeListingAd(LibAppStorage.Layout storage _appStorage, uint96 _listingId, uint64 _chainSelector)
+        internal
+    {
         // Retrieve the loan listing associated with the given listing ID
         LoanListing storage _newListing = _appStorage.loanListings[_listingId];
 
@@ -256,7 +263,7 @@ library LibShared {
         }
 
         // Emit an event to notify that the listing has been closed and tokens have been withdrawn
-        emit withdrawnAdsToken(msg.sender, _listingId, uint8(_newListing.listingStatus), _amount);
+        emit withdrawnAdsToken(msg.sender, _listingId, uint8(_newListing.listingStatus), _amount, _chainSelector);
     }
 
     /**
@@ -269,7 +276,9 @@ library LibShared {
      *
      * Emits a `RequestClosed` event indicating the request ID and the author of the request.
      */
-    function _closeRequest(LibAppStorage.Layout storage _appStorage, uint96 _requestId) internal {
+    function _closeRequest(LibAppStorage.Layout storage _appStorage, uint96 _requestId, uint64 _chainSelector)
+        internal
+    {
         // Retrieve the lending request associated with the given request ID
         Request storage _foundRequest = _appStorage.request[_requestId];
 
@@ -285,7 +294,7 @@ library LibShared {
         _foundRequest.status = Status.CLOSED;
 
         // Emit an event to notify that the request has been closed
-        emit RequestClosed(_requestId, msg.sender);
+        emit RequestClosed(_requestId, msg.sender, _chainSelector);
     }
 
     /**
@@ -313,7 +322,8 @@ library LibShared {
         uint256 _returnDate,
         uint16 _interest,
         address _loanCurrency,
-        address[] memory _whitelist
+        address[] memory _whitelist,
+        uint64 _chainSelector
     ) internal 
     // payable
     {
@@ -364,7 +374,7 @@ library LibShared {
         _newListing.whitelist = _whitelist;
 
         // Emit an event to notify that a new loan listing has been created
-        emit LoanListingCreated(_appStorage.listingId, msg.sender, _loanCurrency, _amount);
+        emit LoanListingCreated(_appStorage.listingId, msg.sender, _loanCurrency, _amount, _chainSelector);
     }
 
     /**
@@ -381,9 +391,12 @@ library LibShared {
      * - `RequestCreated` when a loan request is successfully created.
      * - `RequestServiced` when the loan request is successfully serviced.
      */
-    function _requestLoanFromListing(LibAppStorage.Layout storage _appStorage, uint96 _listingId, uint256 _amount)
-        internal
-    {
+    function _requestLoanFromListing(
+        LibAppStorage.Layout storage _appStorage,
+        uint96 _listingId,
+        uint256 _amount,
+        uint64 _chainSelector
+    ) internal {
         Validator._moreThanZero(_amount);
 
         LoanListing storage _listing = _appStorage.loanListings[_listingId];
@@ -475,8 +488,8 @@ library LibShared {
         }
 
         // Emit events to notify the loan request creation and servicing
-        emit RequestCreated(msg.sender, _appStorage.requestId, _amount, _listing.interest);
-        emit RequestServiced(_newRequest.requestId, _newRequest.lender, _newRequest.author, _amount);
+        emit RequestCreated(msg.sender, _appStorage.requestId, _amount, _listing.interest, _chainSelector);
+        emit RequestServiced(_newRequest.requestId, _newRequest.lender, _newRequest.author, _amount, _chainSelector);
     }
 
     /**
@@ -493,7 +506,12 @@ library LibShared {
      * Emits:
      * - `LoanRepayment` upon successful repayment.
      */
-    function _repayLoan(LibAppStorage.Layout storage _appStorage, uint96 _requestId, uint256 _amount) internal 
+    function _repayLoan(
+        LibAppStorage.Layout storage _appStorage,
+        uint96 _requestId,
+        uint256 _amount,
+        uint64 _chainSelector
+    ) internal 
     // payable
     {
         Validator._moreThanZero(_amount);
@@ -557,125 +575,8 @@ library LibShared {
         }
 
         // Emit event to notify of loan repayment
-        emit LoanRepayment(msg.sender, _requestId, _amount);
+        emit LoanRepayment(msg.sender, _requestId, _amount, _chainSelector);
     }
-
-    // /**
-    //  * @notice Liquidates an undercollateralized P2P loan and transfers assets
-    //  * @dev This function performs the following actions:
-    //  *      1. Verifies the loan is active and eligible for liquidation
-    //  *      2. Calculates health factor based on collateral value vs loan value
-    //  *      3. Repays the loan amount to the lender on behalf of the borrower
-    //  *      4. Transfers collateral to the liquidator with a discount
-    //  *      5. Sends liquidation fee to the protocol
-    //  * @param requestId The unique identifier of the loan request to liquidate
-    //  */
-    // function liquidateUserRequest(uint96 requestId) external payable {
-    //     // Get the loan request from storage
-    //     Request storage request = _appStorage.request[requestId];
-
-    //     // Verify loan is in active state
-    //     if (request.status != Status.SERVICED) {
-    //         revert Protocol__RequestNotServiced();
-    //     }
-
-    //     if (request.author == msg.sender) {
-    //         revert Protocol__OwnerCantLiquidateRequest();
-    //     }
-
-    //     // Store key loan details for easier reference and gas optimization
-    //     address borrower = request.author;
-    //     address lender = request.lender;
-    //     address loanToken = request.loanRequestAddr;
-    //     uint256 totalDebt = request.totalRepayment;
-
-    //     // Calculate loan value in USD
-    //     uint8 loanTokenDecimal = LibGettersImpl._getTokenDecimal(loanToken);
-    //     uint256 loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, loanToken, totalDebt, loanTokenDecimal);
-
-    //     // Calculate total value of collateral in USD
-    //     uint256 totalCollateralValue = 0;
-    //     for (uint256 i = 0; i < request.collateralTokens.length; i++) {
-    //         address collateralToken = request.collateralTokens[i];
-    //         uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[requestId][collateralToken];
-
-    //         if (collateralAmount > 0) {
-    //             uint8 collateralDecimal = LibGettersImpl._getTokenDecimal(collateralToken);
-    //             totalCollateralValue +=
-    //                 LibGettersImpl._getUsdValue(_appStorage, collateralToken, collateralAmount, collateralDecimal);
-    //         }
-    //     }
-
-    //     // Check if loan is past due date (liquidation only allowed for overdue loans)
-    //     bool isPastDue = block.timestamp > request.returnDate;
-    //     // Verify loan is undercollateralized (health factor check)
-    //     // Health factor broken when loan value exceeds collateral value
-    //     bool isUnhealthy = loanUsdValue > totalCollateralValue;
-    //     if (!isPastDue || !isUnhealthy) revert Protocol__NotLiquidatable();
-
-    //     // Update request status to prevent re-entrancy and multiple liquidations
-    //     request.status = Status.LIQUIDATED;
-
-    //     // Handle debt repayment from liquidator to lender
-    //     if (loanToken == Constants.NATIVE_TOKEN) {
-    //         // For native token (ETH), ensure sufficient ETH was sent
-    //         if (msg.value < totalDebt) revert Protocol__InsufficientETH();
-
-    //         // Refund excess ETH to liquidator
-    //         uint256 excess = msg.value - totalDebt;
-    //         if (excess > 0) {
-    //             (bool refundSent,) = payable(msg.sender).call{value: excess}("");
-    //             if (!refundSent) revert Protocol__RefundFailed();
-    //         }
-
-    //         // Transfer the debt amount to the lender
-    //         (bool lenderSent,) = payable(lender).call{value: totalDebt}("");
-    //         if (!lenderSent) revert Protocol__ETHTransferFailed();
-    //     } else {
-    //         // For ERC20 tokens, transfer from liquidator to lender
-    //         IERC20(loanToken).safeTransferFrom(msg.sender, lender, totalDebt);
-    //     }
-
-    //     // Process each collateral token and transfer to liquidator with discount
-    //     for (uint256 i = 0; i < request.collateralTokens.length; i++) {
-    //         address collateralToken = request.collateralTokens[i];
-    //         uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[requestId][collateralToken];
-
-    //         if (collateralAmount > 0) {
-    //             // Calculate discounted amount (apply liquidation discount)
-    //             uint256 discountedAmount = (collateralAmount * (10000 - Constants.LIQUIDATION_DISCOUNT)) / 10000;
-
-    //             // Transfer discounted amount to liquidator
-    //             if (collateralToken == Constants.NATIVE_TOKEN) {
-    //                 (bool sent,) = payable(msg.sender).call{value: discountedAmount}("");
-    //                 if (!sent) revert Protocol__ETHTransferFailed();
-    //             } else {
-    //                 IERC20(collateralToken).safeTransfer(msg.sender, discountedAmount);
-    //             }
-
-    //             // The difference between original collateral and discounted amount goes to protocol as fee
-    //             uint256 protocolAmount = collateralAmount - discountedAmount;
-    //             if (protocolAmount > 0 && _appStorage.s_protocolFeeRecipient != address(0)) {
-    //                 if (collateralToken == Constants.NATIVE_TOKEN) {
-    //                     (bool sent,) = payable(_appStorage.s_protocolFeeRecipient).call{value: protocolAmount}("");
-    //                     if (!sent) revert Protocol__ETHFeeTransferFailed();
-    //                 } else {
-    //                     IERC20(collateralToken).safeTransfer(_appStorage.s_protocolFeeRecipient, protocolAmount);
-    //                 }
-    //             }
-
-    //             // Reset collateral tracking to prevent double-spending
-    //             _appStorage.s_idToCollateralTokenAmount[requestId][collateralToken] = 0;
-    //         }
-    //     }
-
-    //     // Update liquidator's activity metrics for potential rewards
-    //     User storage liquidator = _appStorage.addressToUser[msg.sender];
-    //     liquidator.totalLiquidationAmount += totalCollateralValue;
-
-    //     // Emit event for off-chain tracking and transparency
-    //     emit RequestLiquidated(requestId, msg.sender, borrower, lender, totalCollateralValue);
-    // }
 
     function _settleFees(LibAppStorage.Layout storage _appStorage, address _token, uint256 _amount)
         internal
