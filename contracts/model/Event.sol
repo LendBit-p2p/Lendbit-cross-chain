@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.20;
 
+import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
+
 event RequestCreated(
     address indexed _borrower,
     uint96 indexed requestId,
     uint256 _amount,
-    uint16 _interest
+    uint16 _interest,
+    uint64 _chainSelector
 );
 
 event OrderCreated(
@@ -26,10 +29,15 @@ event RequestServiced(
     uint96 indexed _requestId,
     address indexed _lender,
     address indexed _borrower,
-    uint256 _amount
+    uint256 _amount,
+    uint64 _chainSelector
 );
 
-event RequestClosed(uint96 indexed _requestId, address indexed _borrower);
+event RequestClosed(
+    uint96 indexed _requestId,
+    address indexed _borrower,
+    uint64 _chainSelector
+);
 
 event CollateralWithdrawn(
     address indexed sender,
@@ -47,7 +55,12 @@ event AcceptedListedAds(
     uint8 adStatus
 );
 
-event LoanRepayment(address indexed sender, uint96 id, uint256 amount);
+event LoanRepayment(
+    address indexed sender,
+    uint96 id,
+    uint256 amount,
+    uint64 chainSelector
+);
 
 event UpdateLoanableToken(
     address indexed _token,
@@ -66,14 +79,16 @@ event withdrawnAdsToken(
     address indexed sender,
     uint96 indexed _orderId,
     uint8 indexed orderStatus,
-    uint256 _amount
+    uint256 _amount,
+    uint64 _chainSelector
 );
 
 event LoanListingCreated(
     uint96 indexed listingId,
     address indexed sender,
     address indexed tokenAddress,
-    uint256 amount
+    uint256 amount,
+    uint64 chainSelector
 );
 
 event RequestLiquidated(
@@ -148,3 +163,33 @@ event Repay(
     uint256 indexed amountRepaid
 );
 // event Withdraw(address indexed sender,address indexed token,uint256 amountWithdrawn,uint256 shares);
+
+// CCIP Events
+
+event CCIPMessageReceived(
+    bytes32 indexed messageId,
+    uint64 indexed sourceChainSelector,
+    bytes indexed sender,
+    Client.EVMTokenAmount[] destTokenAmounts
+);
+
+event CCIPMessageSent(
+    bytes32 indexed messageId,
+    uint64 indexed sourceChainSelector,
+    bytes indexed sender,
+    Client.EVMTokenAmount[] destTokenAmounts
+);
+
+event CCIPMessageFailed(
+    bytes32 indexed messageId,
+    uint64 indexed sourceChainSelector,
+    bytes indexed sender,
+    Client.EVMTokenAmount[] destTokenAmounts
+);
+
+event CCIPMessageExecuted(
+    bytes32 indexed messageId,
+    uint64 indexed sourceChainSelector,
+    bytes indexed sender,
+    Client.EVMTokenAmount[] destTokenAmounts
+);
