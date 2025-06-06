@@ -127,7 +127,8 @@ event Deposit(
     address indexed user,
     address indexed token,
     uint256 amount,
-    uint256 sharesMinted
+    uint256 sharesMinted, 
+    uint64 chainSelector
 );
 
 /**
@@ -154,8 +155,18 @@ event InterestAccrued(address indexed token, uint256 interestAccrued);
 event Borrow(
     address indexed sender,
     address indexed token,
-    uint256 indexed amount
+    uint256 indexed amount,
+    uint64 chainSelector
 );
+
+event Repay(
+    address indexed sender,
+    address indexed token,
+    uint256 indexed amountRepaid,
+    uint64 chainSelector
+);
+
+event Withdraw(address indexed sender,address indexed token,uint256 amountWithdrawn,uint256 shares, uint64 chainSelector);
 
 event Repay(
     address indexed sender,
