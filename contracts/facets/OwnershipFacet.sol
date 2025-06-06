@@ -11,7 +11,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import "../utils/validators/Error.sol";
 import "../model/Event.sol";
 
-contract OwnershipFacet is IERC173, AppStorage {
+contract OwnershipFacet is AppStorage,  IERC173{
     using SafeERC20 for IERC20;
 
     function transferOwnership(address _newOwner) external override {
