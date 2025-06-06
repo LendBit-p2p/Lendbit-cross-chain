@@ -11,7 +11,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import "../utils/validators/Error.sol";
 import "../model/Event.sol";
 
-contract OwnershipFacet is AppStorage,  IERC173{
+contract OwnershipFacet is AppStorage, IERC173 {
     using SafeERC20 for IERC20;
 
     function transferOwnership(address _newOwner) external override {
@@ -238,5 +238,29 @@ contract OwnershipFacet is AppStorage,  IERC173{
 
         // Emit an event to notify that a loanable token has been added
         emit UpdateLoanableToken(_token, _priceFeed, msg.sender);
+    }
+
+    /**
+     * @dev Adds a new chain selector and sender to the supported chains list.
+     * @param _chainSelector The chain selector to add.
+     * @param _sender The sender address to add.
+     */
+    function addSupportedChain(
+        uint64 _chainSelector,
+        address _sender
+    ) external {
+        LibDiamond.enforceIsContractOwner();
+        _appStorage.s_chainSelectorSupported[_chainSelector] = true;
+        _appStorage.s_senderSupported[_chainSelector] = _sender;
+    }
+
+    /**
+     * @dev Removes a chain selector and sender from the supported chains list.
+     * @param _chainSelector The chain selector to remove.
+     */
+    function removeSupportedChain(uint64 _chainSelector) external {
+        LibDiamond.enforceIsContractOwner();
+        _appStorage.s_chainSelectorSupported[_chainSelector] = false;
+        _appStorage.s_senderSupported[_chainSelector] = address(0);
     }
 }
