@@ -1,18 +1,9 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.9;
 
-import {LibDiamond} from "../libraries/LibDiamond.sol";
 import {LibProtocol} from "../libraries/LibProtocol.sol";
-import {Validator} from "../utils/validators/Validator.sol";
-import {Constants} from "../utils/constants/Constant.sol";
-import {Utils} from "../utils/functions/Utils.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../interfaces/IUniswapV2Router02.sol";
 import "../utils/functions/AppStorage.sol";
-import "../model/Protocol.sol";
-import "../model/Event.sol";
-import "../utils/validators/Error.sol";
+import {Constants} from "../utils/constants/Constant.sol";
 
 /**
  * @title ProtocolFacet
@@ -26,7 +17,6 @@ import "../utils/validators/Error.sol";
  * contains core operational functions, and `Getters` allows querying data from the protocol.
  */
 contract ProtocolFacet is AppStorage {
-    using SafeERC20 for IERC20;
     using LibProtocol for LibAppStorage.Layout;
 
     /**
