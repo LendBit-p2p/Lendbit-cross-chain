@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
 import {CCIPReceiver} from "../utils/functions/CCIPReceiver.sol";
-import {AppStorage} from "../utils/functions/AppStorage.sol";
 import {CCIPMessageReceived, CCIPMessageExecuted} from "../model/Event.sol";
 import {CCIPMessageType} from "../model/Protocol.sol";
 import {LibCCIP} from "../libraries/LibCCIP.sol";
@@ -13,7 +12,7 @@ import {LibAppStorage} from "../libraries/LibAppStorage.sol";
  * @title CcipFacet
  * @notice This facet is responsible for handling CCIP messages.
  */
-contract CcipFacet is AppStorage, CCIPReceiver {
+contract CcipFacet is CCIPReceiver {
     using LibCCIP for LibAppStorage.Layout;
 
     /**

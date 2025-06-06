@@ -7,10 +7,11 @@ import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
 
 import {IERC165} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 import {Constants} from "../constants/Constant.sol";
+import {AppStorage} from "./AppStorage.sol";
 
 /** This Code was taken from the Chainlink CCIP repo with some modifications */
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
-abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
+abstract contract CCIPReceiver is AppStorage, IAny2EVMMessageReceiver, IERC165 {
     /// @notice IERC165 supports an interfaceId.
     /// @param interfaceId The interfaceId to check.
     /// @return true if the interfaceId is supported.
@@ -32,7 +33,13 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
     /// @inheritdoc IAny2EVMMessageReceiver
     function ccipReceive(
         Client.Any2EVMMessage calldata message
-    ) external virtual override onlyRouter {
+    )
+        external
+        virtual
+        override
+        onlyRouter
+        onlySupportedChain(message.sourceChainSelector, message.sender)
+    {
         _ccipReceive(message);
     }
 
@@ -49,12 +56,23 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
     }
 
     error InvalidRouter(address router);
+    error ChainSelectorNotSupported(uint64 chainSelector);
+    error SenderNotSupported(address sender);
 
     /// @dev only calls from the set router are accepted.
-    //TODO: add a modifier to also check if the message is from the correct chain selector
-    //TODO: add a modifier to also check if the message is from the correct chain address
     modifier onlyRouter() {
         if (msg.sender != getRouter()) revert InvalidRouter(msg.sender);
+        _;
+    }
+
+    /// @dev only calls from the supported chain and sender are accepted.
+    modifier onlySupportedChain(uint64 _chainSelector, bytes calldata _sender) {
+        address sender = abi.decode(_sender, (address));
+
+        if (!_appStorage.s_chainSelectorSupported[_chainSelector])
+            revert ChainSelectorNotSupported(_chainSelector);
+        if (_appStorage.s_senderSupported[_chainSelector] != sender)
+            revert SenderNotSupported(sender);
         _;
     }
 }

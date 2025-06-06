@@ -44,6 +44,12 @@ library LibAppStorage {
         mapping(address => mapping(address => uint256)) s_addressToLockedPoolCollateral;
         ///@dev stora
         mapping(address => mapping(address => UserBorrowData)) s_userBorrows;
+        ///@dev for checking if the chain selector is supported
+        mapping(uint64 => bool) s_chainSelectorSupported;
+        ///@dev for checking if the sender address is of the supported chain
+        mapping(uint64 => address) s_senderSupported;
+        ///@dev for checking if the message is already consumed
+        mapping(uint64 => bool) s_messageConsumed;
         ///@dev Liquidity PoolConfig
         address s_protocolFeeRecipient;
         bool isProtocolPoolActive;
