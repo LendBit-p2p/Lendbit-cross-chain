@@ -61,8 +61,8 @@ contract SharedFacet is AppStorage {
 
     /**
      * @dev Allows anyone to liquidate a loan.
-     * @param {uint96} The ID of the loan to liquidate.
-     * @param {bool} Whether the loan is from the liquidity pool.
+     * @param _requestId The ID of the loan to liquidate.
+     * @param _isLP Whether the loan is from the liquidity pool.
      *
      * Requirements:
      * - The loan must be in the active state.
@@ -72,10 +72,21 @@ contract SharedFacet is AppStorage {
      * @return _isLiquidated Whether the loan was successfully liquidated.
      */
     function liquidateLoans(
-        uint96 /*_requestId*/,
-        bool /*_isLP*/
+        uint96 _requestId,
+        bool _isLP
     ) external payable returns (bool _isLiquidated) {
-        //TODO: Implement the liquidation logic
-        return true;
+        if (_isLP) {
+            _appStorage._liquidateLp(
+                _requestId,
+                msg.sender,
+                Constants.CHAIN_SELECTOR
+            );
+        } else {
+            _appStorage._liquidateRequest(
+                _requestId,
+                msg.sender,
+                Constants.CHAIN_SELECTOR
+            );
+        }
     }
 }
