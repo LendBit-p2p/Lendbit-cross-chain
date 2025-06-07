@@ -5,7 +5,7 @@ import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
 import {CCIPReceiver} from "../utils/functions/CCIPReceiver.sol";
 import {CCIPMessageReceived, CCIPMessageExecuted} from "../model/Event.sol";
 import {CCIPMessageType} from "../model/Protocol.sol";
-import {LibCCIP} from "../libraries/LibCCIP.sol";
+import {LibCCIP} from "../libraries/ccip/LibCCIP.sol";
 import {LibAppStorage} from "../libraries/LibAppStorage.sol";
 
 /**
@@ -44,7 +44,8 @@ contract CcipFacet is CCIPReceiver {
         _appStorage._resolveCCIPMessage(
             messageType,
             messageData,
-            message.sourceChainSelector
+            message.sourceChainSelector,
+            message.destTokenAmounts
         );
 
         emit CCIPMessageExecuted(
