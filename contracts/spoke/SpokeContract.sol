@@ -26,4 +26,57 @@ contract SpokeContract {
 
         i_link.approve(address(i_router), type(uint256).max);
     }
+
+    // lp
+
+    /**
+     * @notice Deposit tokens into the pool
+     * @param token The address of the token to deposit
+     * @param amount The amount of tokens to deposit
+     * @return shares The amount of shares received
+     */
+    function deposit(
+        address token,
+        uint256 amount
+    ) external payable returns (uint256 shares) {
+        //TODO: // Currently Working on the Todo
+        return 0;
+    }
+
+    /**
+     * @notice Withdraw tokens from the pool
+     * @param token The address of the token to withdraw
+     * @param amount The amount of tokens to withdraw
+     * @return amountWithdrawn The amount of tokens withdrawn
+     */
+    function withdraw(
+        address token,
+        uint256 amount
+    ) external returns (uint256 amountWithdrawn) {
+        //TODO: // Currently Working on the Todo
+        return 0;
+    }
+
+    /**
+     * @notice Borrow tokens from the pool
+     * @param token The address of the token to borrow
+     * @param amount The amount of tokens to borrow
+     */
+    function borrowFromPool(address token, uint256 amount) external {
+        //TODO: // Currently Working on the Todo
+    }
+
+    /**
+     * @notice Repay tokens to the pool
+     * @param token The address of the token to repay
+     * @param amount The amount of tokens to repay
+     * @return amountRepaid The amount of tokens repaid
+     */
+    function repay(
+        address token,
+        uint256 amount
+    ) external payable returns (uint256 amountRepaid) {
+        //TODO: // Currently Working on the Todo
+        return 0;
+    }
 }
