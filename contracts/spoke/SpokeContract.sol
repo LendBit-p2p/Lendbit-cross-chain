@@ -165,4 +165,29 @@ contract SpokeContract {
     function repayLoan(uint96 _requestId, uint256 _amount) external payable {
         //TODO: // Currently Working on the Todo
     }
+
+    // Shared
+    /**
+     * @notice Deposit collateral
+     * @param _tokenCollateralAddress The address of the collateral token
+     * @param _amountOfCollateral The amount of collateral to deposit
+     */
+    function depositCollateral(
+        address _tokenCollateralAddress,
+        uint256 _amountOfCollateral
+    ) external payable {
+        //TODO: // Currently Working on the Todo
+    }
+
+    /**
+     * @notice Withdraw collateral
+     * @param _tokenCollateralAddress The address of the collateral token
+     * @param _amountOfCollateral The amount of collateral to withdraw
+     */
+    function withdrawCollateral(
+        address _tokenCollateralAddress,
+        uint256 _amountOfCollateral
+    ) external {
+        //TODO: // Currently Working on the Todo
+    }
 }
