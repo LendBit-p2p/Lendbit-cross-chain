@@ -8,6 +8,7 @@ import {IRouterClient} from "@chainlink/contracts-ccip/contracts/interfaces/IRou
 import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
 
 contract SpokeContract {
+    address public constant NATIVE_TOKEN = address(1);
     address immutable i_hub;
     uint64 immutable i_chainSelector;
     LinkTokenInterface immutable i_link;
@@ -78,5 +79,90 @@ contract SpokeContract {
     ) external payable returns (uint256 amountRepaid) {
         //TODO: // Currently Working on the Todo
         return 0;
+    }
+
+    // P2P
+    /**
+     * @notice Create a lending request
+     * @param _amount The amount of tokens to lend
+     * @param _interest The interest rate
+     * @param _returnDate The date the loan is due
+     * @param _loanCurrency The currency of the loan
+     */
+    function createLendingRequest(
+        uint128 _amount,
+        uint16 _interest,
+        uint256 _returnDate,
+        address _loanCurrency
+    ) external {
+        //TODO: // Currently Working on the Todo
+    }
+
+    /**
+     * @notice Service a lending request
+     * @param _requestId The ID of the request
+     * @param _tokenAddress The address of the token to service
+     */
+    function serviceRequest(
+        uint96 _requestId,
+        address _tokenAddress
+    ) external payable {
+        //TODO: // Currently Working on the Todo
+    }
+
+    /**
+     * @notice Close a listing ad
+     * @param _listingId The ID of the listing
+     */
+    function closeListingAd(uint96 _listingId) external {
+        //TODO: // Currently Working on the Todo
+    }
+
+    /**
+     * @notice Close a lending request
+     * @param _requestId The ID of the request
+     */
+    function closeRequest(uint96 _requestId) external {
+        //TODO: // Currently Working on the Todo
+    }
+
+    /**
+     * @notice Create a loan listing
+     * @param _amount The amount of tokens to lend
+     * @param _min_amount The minimum amount of tokens to lend
+     * @param _max_amount The maximum amount of tokens to lend
+     * @param _returnDate The date the loan is due
+     * @param _interest The interest rate
+     * @param _loanCurrency The currency of the loan
+     * @param _whitelist The addresses of the whitelisted tokens
+     */
+    function createLoanListing(
+        uint256 _amount,
+        uint256 _min_amount,
+        uint256 _max_amount,
+        uint256 _returnDate,
+        uint16 _interest,
+        address _loanCurrency,
+        address[] memory _whitelist
+    ) external payable {
+        //TODO: // Currently Working on the Todo
+    }
+
+    /**
+     * @notice Request a loan from a listing
+     * @param _listingId The ID of the listing
+     * @param _amount The amount of tokens to request
+     */
+    function requestLoanFromListing(uint96 _listingId, uint256 _amount) public {
+        //TODO: // Currently Working on the Todo
+    }
+
+    /**
+     * @notice Repay a loan
+     * @param _requestId The ID of the request
+     * @param _amount The amount of tokens to repay
+     */
+    function repayLoan(uint96 _requestId, uint256 _amount) external payable {
+        //TODO: // Currently Working on the Todo
     }
 }
