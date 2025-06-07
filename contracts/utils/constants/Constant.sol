@@ -15,6 +15,7 @@ library Constants {
     uint256 constant MAX_LIQUIDATION_BONUS = 10000; // 100%
     uint256 constant LIQUIDATION_DISCOUNT = 1000; // 10%
     uint256 constant MAX_RESERVE_FACTOR = 5000; // 50%
+    address constant LINK = 0xE4aB69C077896252FAFBD49EFD26B5D171A32410;
 
     // Constants to avoid magic numbers
     uint256 constant BASIS_POINTS_SCALE = 1e4; // 100% = 10000 basis points
