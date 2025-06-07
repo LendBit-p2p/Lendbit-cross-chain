@@ -2,30 +2,55 @@
 pragma solidity ^0.8.20;
 
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
+import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.sol";
 import {IERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IRouterClient} from "@chainlink/contracts-ccip/contracts/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
+import {CCIPReceiver} from "@chainlink/contracts-ccip/contracts/applications/CCIPReceiver.sol";
+import {Validitions} from "./libraries/Validitions.sol";
+import {CCIPMessageSent} from "./libraries/Events.sol";
+import "./libraries/Errors.sol";
 
-contract SpokeContract {
+contract SpokeContract is CCIPReceiver {
+    using SafeERC20 for IERC20;
+
     address public constant NATIVE_TOKEN = address(1);
     address immutable i_hub;
     uint64 immutable i_chainSelector;
     LinkTokenInterface immutable i_link;
-    IRouterClient immutable i_router;
+    IWERC20 immutable i_weth;
+
+    //enum for the CCIP message type
+    enum CCIPMessageType {
+        DEPOSIT,
+        DEPOSIT_COLLATERAL,
+        WITHDRAW,
+        WITHDRAW_COLLATERAL,
+        BORROW,
+        CREATE_REQUEST,
+        SERVICE_REQUEST,
+        CREATE_LISTING,
+        BORROW_FROM_LISTING,
+        REPAY,
+        REPAY_LOAN,
+        LIQUIDATE
+    }
 
     constructor(
         address _hub,
         uint64 _chainSelector,
         address _link,
-        address _router
-    ) {
+        address _router,
+        address _weth
+    ) CCIPReceiver(_router) {
         i_hub = _hub;
         i_chainSelector = _chainSelector;
         i_link = LinkTokenInterface(_link);
-        i_router = IRouterClient(_router);
+        i_weth = IWERC20(_weth);
 
-        i_link.approve(address(i_router), type(uint256).max);
+        i_link.approve(address(_router), type(uint256).max);
+        IERC20(_weth).approve(address(_router), type(uint256).max);
     }
 
     // lp
@@ -176,7 +201,74 @@ contract SpokeContract {
         address _tokenCollateralAddress,
         uint256 _amountOfCollateral
     ) external payable {
-        //TODO: // Currently Working on the Todo
+        Validitions.validateTokenParams(
+            _tokenCollateralAddress,
+            _amountOfCollateral
+        );
+
+        Client.EVMTokenAmount[]
+            memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
+        tokensToSendDetails[0] = Client.EVMTokenAmount({
+            token: _tokenCollateralAddress == NATIVE_TOKEN
+                ? address(i_weth)
+                : _tokenCollateralAddress,
+            amount: _amountOfCollateral
+        });
+
+        bytes memory messageData = abi.encode(
+            CCIPMessageType.DEPOSIT_COLLATERAL,
+            abi.encode(_tokenCollateralAddress, _amountOfCollateral, msg.sender)
+        );
+
+        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(i_hub),
+            data: messageData,
+            tokenAmounts: tokensToSendDetails,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({
+                    gasLimit: 200_000,
+                    allowOutOfOrderExecution: true
+                })
+            ),
+            feeToken: address(0)
+        });
+
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(
+            i_chainSelector,
+            message
+        );
+
+        if (
+            _tokenCollateralAddress == NATIVE_TOKEN &&
+            msg.value < (fee + _amountOfCollateral)
+        ) {
+            revert Spoke__InsufficientNativeCollateral();
+        } else {
+            if (msg.value < fee) {
+                revert Spoke__InsufficientFee();
+            }
+        }
+
+        if (_tokenCollateralAddress == NATIVE_TOKEN) {
+            i_weth.deposit{value: _amountOfCollateral}();
+        } else {
+            IERC20(_tokenCollateralAddress).safeTransferFrom(
+                msg.sender,
+                address(this),
+                _amountOfCollateral
+            );
+        }
+
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
+            value: msg.value
+        }(i_chainSelector, message);
+
+        emit CCIPMessageSent(
+            messageId,
+            i_chainSelector,
+            msg.sender,
+            tokensToSendDetails
+        );
     }
 
     /**
@@ -197,5 +289,25 @@ contract SpokeContract {
     function getFees() public view returns (uint256) {
         //TODO: // Currently Working on the Todo
         return 0;
+    }
+
+    //////////////////
+    /// INTERNALS ///
+    ////////////////
+    function _ccipReceive(
+        Client.Any2EVMMessage memory message
+    ) internal override {
+        (CCIPMessageType messageType, bytes memory data) = abi.decode(
+            message.data,
+            (CCIPMessageType, bytes)
+        );
+
+        if (messageType == CCIPMessageType.DEPOSIT_COLLATERAL) {
+            (
+                address tokenCollateralAddress,
+                uint256 amountOfCollateral,
+                address sender
+            ) = abi.decode(data, (address, uint256, address));
+        }
     }
 }
