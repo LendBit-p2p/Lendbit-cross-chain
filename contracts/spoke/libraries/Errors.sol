@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+error Spoke__CollateralAmountTooLow();
+error Spoke__InsufficientCollateral();
+error Spoke__InvalidCollateralToken();
+error Spoke__InvalidToken();
+error Spoke__InsufficientNativeCollateral();
+error Spoke__InsufficientFee();
