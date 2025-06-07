@@ -217,7 +217,7 @@ contract SpokeContract is CCIPReceiver {
 
         bytes memory messageData = abi.encode(
             CCIPMessageType.DEPOSIT_COLLATERAL,
-            abi.encode(_tokenCollateralAddress, _amountOfCollateral, msg.sender)
+            abi.encode(_tokenCollateralAddress == NATIVE_TOKEN, msg.sender)
         );
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
@@ -286,9 +286,10 @@ contract SpokeContract is CCIPReceiver {
     //////////////////
     ///// GETTERS ////
     //////////////////
-    function getFees() public view returns (uint256) {
-        //TODO: // Currently Working on the Todo
-        return 0;
+    function getFees(
+        Client.EVM2AnyMessage memory message
+    ) external view returns (uint256) {
+        return IRouterClient(i_ccipRouter).getFee(i_chainSelector, message);
     }
 
     //////////////////
