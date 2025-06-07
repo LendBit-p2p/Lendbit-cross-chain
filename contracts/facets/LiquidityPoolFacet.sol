@@ -33,16 +33,8 @@ contract LiquidityPoolFacet is AppStorage {
      *
      * Emits a `Deposit` event on successful deposit.
      */
-    function deposit(
-        address token,
-        uint256 amount
-    ) external payable returns (uint256 shares) {
-        return _appStorage._deposit(
-            token,
-            amount,
-            msg.sender,
-            Constants.CHAIN_SELECTOR
-        );
+    function deposit(address token, uint256 amount) external payable returns (uint256 shares) {
+        return _appStorage._deposit(token, amount, msg.sender, Constants.CHAIN_SELECTOR);
     }
 
     /**
@@ -60,12 +52,7 @@ contract LiquidityPoolFacet is AppStorage {
      * Emits a `Borrow` event on successful borrow.
      */
     function borrowFromPool(address token, uint256 amount) external {
-        _appStorage._borrowFromPool(
-            token,
-            amount,
-            msg.sender,
-            Constants.CHAIN_SELECTOR
-        );
+        _appStorage._borrowFromPool(token, amount, msg.sender, Constants.CHAIN_SELECTOR);
     }
 
     /**
@@ -82,16 +69,8 @@ contract LiquidityPoolFacet is AppStorage {
      *
      * Emits a `Repay` event on successful repayment.
      */
-    function repay(
-        address token,
-        uint256 amount
-    ) external payable returns (uint256 amountRepaid) {
-        return _appStorage._repay(
-            token,
-            amount,
-            msg.sender,
-            Constants.CHAIN_SELECTOR
-        );
+    function repay(address token, uint256 amount) external payable returns (uint256 amountRepaid) {
+        return _appStorage._repay(token, amount, msg.sender, Constants.CHAIN_SELECTOR);
     }
 
     /**
@@ -109,16 +88,8 @@ contract LiquidityPoolFacet is AppStorage {
      *
      * Emits a `Withdraw` event on successful withdrawal.
      */
-    function withdraw(
-        address token,
-        uint256 amount
-    ) external returns (uint256 amountWithdrawn) {
-        return _appStorage._withdraw(
-            token,
-            amount,
-            msg.sender,
-            Constants.CHAIN_SELECTOR
-        );
+    function withdraw(address token, uint256 amount) external returns (uint256 amountWithdrawn) {
+        return _appStorage._withdraw(token, amount, msg.sender, Constants.CHAIN_SELECTOR);
     }
 
     /////////////////////////
@@ -134,22 +105,13 @@ contract LiquidityPoolFacet is AppStorage {
      * @return lastUpdateTimestamp The last update timestamp for the user's borrow data
      * @return isActive Whether the user's borrow is active
      */
-    function getUserBorrowData(
-        address _user,
-        address _token
-    )
+    function getUserBorrowData(address _user, address _token)
         external
         view
-        returns (
-            uint256 borrowedAmount,
-            uint256 borrowIndex,
-            uint256 lastUpdateTimestamp,
-            bool isActive
-        )
+        returns (uint256 borrowedAmount, uint256 borrowIndex, uint256 lastUpdateTimestamp, bool isActive)
     {
         borrowedAmount = LibLiquidityPool._calculateUserDebt(
-            _appStorage.s_tokenData[_token],
-            _appStorage.s_userBorrows[_user][_token]
+            _appStorage.s_tokenData[_token], _appStorage.s_userBorrows[_user][_token]
         );
 
         return (
@@ -172,9 +134,7 @@ contract LiquidityPoolFacet is AppStorage {
      * @return isActive Whether the pool is active
      * @return initialize Whether the pool is initialized
      */
-    function getProtocolPoolConfig(
-        address _token
-    )
+    function getProtocolPoolConfig(address _token)
         external
         view
         returns (
@@ -208,10 +168,7 @@ contract LiquidityPoolFacet is AppStorage {
      * @param token The address of the token
      * @return The maximum redeemable amount for the user
      */
-    function getUserPoolDeposit(
-        address user,
-        address token
-    ) external view returns (uint256) {
+    function getUserPoolDeposit(address user, address token) external view returns (uint256) {
         return maxRedeemable(user, token);
     }
 
@@ -223,17 +180,10 @@ contract LiquidityPoolFacet is AppStorage {
      * @return totalBorrows The total amount borrowed from the pool for the token
      * @return lastUpdateTimestamp The last time the token data was updated
      */
-    function getPoolTokenData(
-        address token
-    )
+    function getPoolTokenData(address token)
         external
         view
-        returns (
-            uint256 totalSupply,
-            uint256 poolLiquidity,
-            uint256 totalBorrows,
-            uint256 lastUpdateTimestamp
-        )
+        returns (uint256 totalSupply, uint256 poolLiquidity, uint256 totalBorrows, uint256 lastUpdateTimestamp)
     {
         return (
             _appStorage.s_tokenData[token].totalSupply,
@@ -249,10 +199,7 @@ contract LiquidityPoolFacet is AppStorage {
      * @param token The address of the token
      * @return debt The current debt amount including interest
      */
-    function getUserDebt(
-        address user,
-        address token
-    ) external view returns (uint256 debt) {
+    function getUserDebt(address user, address token) external view returns (uint256 debt) {
         UserBorrowData memory userBorrowData = _appStorage.s_userBorrows[user][token];
         TokenData memory tokenData = _appStorage.s_tokenData[token];
         ProtocolPool memory protocolPool = _appStorage.s_protocolPool[token];
@@ -261,10 +208,7 @@ contract LiquidityPoolFacet is AppStorage {
             return 0;
         }
 
-        if (
-            block.timestamp == tokenData.lastUpdateTimestamp ||
-            tokenData.totalBorrows == 0
-        ) {
+        if (block.timestamp == tokenData.lastUpdateTimestamp || tokenData.totalBorrows == 0) {
             return userBorrowData.borrowedAmount;
         }
 
@@ -273,21 +217,11 @@ contract LiquidityPoolFacet is AppStorage {
         }
 
         uint256 timeElapsed = block.timestamp - tokenData.lastUpdateTimestamp;
-        uint256 utilization = LibInterestRateModel.calculateUtilization(
-            tokenData.totalBorrows,
-            tokenData.poolLiquidity
-        );
-        uint256 interestRate = LibInterestRateModel.calculateInterestRate(
-            protocolPool,
-            utilization
-        );
-        uint256 factor = ((interestRate * timeElapsed) * 1e18) /
-            (10000 * 31536000);
-        uint256 currentBorrowIndex = tokenData.borrowIndex +
-            ((tokenData.borrowIndex * factor) / 1e18);
-        debt =
-            (userBorrowData.borrowedAmount * currentBorrowIndex) /
-            userBorrowData.borrowIndex;
+        uint256 utilization = LibInterestRateModel.calculateUtilization(tokenData.totalBorrows, tokenData.poolLiquidity);
+        uint256 interestRate = LibInterestRateModel.calculateInterestRate(protocolPool, utilization);
+        uint256 factor = ((interestRate * timeElapsed) * 1e18) / (10000 * 31536000);
+        uint256 currentBorrowIndex = tokenData.borrowIndex + ((tokenData.borrowIndex * factor) / 1e18);
+        debt = (userBorrowData.borrowedAmount * currentBorrowIndex) / userBorrowData.borrowIndex;
 
         return debt;
     }
@@ -298,10 +232,7 @@ contract LiquidityPoolFacet is AppStorage {
      * @param compoundingPeriods The number of compounding periods per year
      * @return _apy The APY in basis points
      */
-    function calculatePoolAPY(
-        uint256 apr,
-        uint256 compoundingPeriods
-    ) external pure returns (uint256 _apy) {
+    function calculatePoolAPY(uint256 apr, uint256 compoundingPeriods) external pure returns (uint256 _apy) {
         _apy = LibRateCalculations.calculateAPY(apr, compoundingPeriods);
     }
 
@@ -321,13 +252,7 @@ contract LiquidityPoolFacet is AppStorage {
         uint256 totalBorrows,
         uint256 poolLiquidity
     ) external pure returns (uint256 _apr) {
-        _apr = LibRateCalculations.calculateAPR(
-            baseRate,
-            slopeRate,
-            optimalUtilization,
-            totalBorrows,
-            poolLiquidity
-        );
+        _apr = LibRateCalculations.calculateAPR(baseRate, slopeRate, optimalUtilization, totalBorrows, poolLiquidity);
     }
 
     /**
@@ -347,18 +272,9 @@ contract LiquidityPoolFacet is AppStorage {
         uint256 totalBorrows,
         uint256 poolLiquidity
     ) external pure returns (uint256 apr, uint256 apy) {
-        apr = LibRateCalculations.calculateAPR(
-            baseRate,
-            slopeRate,
-            optimalUtilization,
-            totalBorrows,
-            poolLiquidity
-        );
+        apr = LibRateCalculations.calculateAPR(baseRate, slopeRate, optimalUtilization, totalBorrows, poolLiquidity);
 
-        apy = LibRateCalculations.calculateAPY(
-            apr,
-            Constants.DEFAULT_COMPOUNDING_PERIODS
-        );
+        apy = LibRateCalculations.calculateAPY(apr, Constants.DEFAULT_COMPOUNDING_PERIODS);
 
         return (apr, apy);
     }
@@ -373,10 +289,7 @@ contract LiquidityPoolFacet is AppStorage {
      * @param token The address of the token
      * @return maxRedeemableAmount The maximum redeemable amount for the user
      */
-    function maxRedeemable(
-        address user,
-        address token
-    ) internal view returns (uint256) {
+    function maxRedeemable(address user, address token) internal view returns (uint256) {
         // Check if the user has any shares in the pool
         uint256 _shares = _appStorage.s_addressToUserPoolShare[user][token];
         if (_shares == 0) return 0;

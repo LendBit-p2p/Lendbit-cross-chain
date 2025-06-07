@@ -5,7 +5,7 @@ import "../contracts/interfaces/IDiamondCut.sol";
 import "../contracts/facets/DiamondCutFacet.sol";
 import "../contracts/facets/DiamondLoupeFacet.sol";
 import "../contracts/facets/OwnershipFacet.sol";
-import {SharedFacet} from "../contracts/facets/SharedFacets.sol";
+import {SharedFacet} from "../contracts/facets/SharedFacet.sol";
 import "forge-std/Test.sol";
 import "../contracts/Diamond.sol";
 import "../contracts/facets/ProtocolFacet.sol";
@@ -61,26 +61,10 @@ contract ProtocolTest is Test, IDiamondCut {
         ownerF = new OwnershipFacet();
         protocolFacet = new ProtocolFacet();
 
-        (USDT_CONTRACT_ADDRESS, USDT_USD) = deployERC20ContractAndAddPriceFeed(
-            "USDT",
-            6,
-            1
-        );
-        (DAI_CONTRACT_ADDRESS, DAI_USD) = deployERC20ContractAndAddPriceFeed(
-            "DAI",
-            18,
-            1
-        );
-        (LINK_CONTRACT_ADDRESS, LINK_USD) = deployERC20ContractAndAddPriceFeed(
-            "LINK",
-            18,
-            10
-        );
-        (WETH_CONTRACT_ADDRESS, WETH_USD) = deployERC20ContractAndAddPriceFeed(
-            "WETH",
-            18,
-            2000
-        );
+        (USDT_CONTRACT_ADDRESS, USDT_USD) = deployERC20ContractAndAddPriceFeed("USDT", 6, 1);
+        (DAI_CONTRACT_ADDRESS, DAI_USD) = deployERC20ContractAndAddPriceFeed("DAI", 18, 1);
+        (LINK_CONTRACT_ADDRESS, LINK_USD) = deployERC20ContractAndAddPriceFeed("LINK", 18, 10);
+        (WETH_CONTRACT_ADDRESS, WETH_USD) = deployERC20ContractAndAddPriceFeed("WETH", 18, 2000);
 
         tokens.push(USDT_CONTRACT_ADDRESS);
         tokens.push(DAI_CONTRACT_ADDRESS);
@@ -94,7 +78,7 @@ contract ProtocolTest is Test, IDiamondCut {
         priceFeed.push(WETH_USD);
         priceFeed.push(WETH_USD);
 
-        FacetCut[] memory cut = new FacetCut[](3);
+        FacetCut[] memory cut = new FacetCut[](4);
         cut[0] = FacetCut({
             facetAddress: address(dLoupe),
             action: FacetCutAction.Add,
@@ -106,6 +90,11 @@ contract ProtocolTest is Test, IDiamondCut {
             functionSelectors: generateSelectors("OwnershipFacet")
         });
         cut[2] = FacetCut({
+            facetAddress: address(protocolFacet),
+            action: FacetCutAction.Add,
+            functionSelectors: generateSelectors("ProtocolFacet")
+        });
+           cut[3] = FacetCut({
             facetAddress: address(protocolFacet),
             action: FacetCutAction.Add,
             functionSelectors: generateSelectors("ProtocolFacet")
@@ -129,42 +118,27 @@ contract ProtocolTest is Test, IDiamondCut {
         ERC20Mock(LINK_CONTRACT_ADDRESS).mint(owner, 500e18);
     }
 
-    function _mintTokenToAddress(
-        address _token,
-        address _to,
-        uint256 _amount
-    ) internal {
+    function _mintTokenToAddress(address _token, address _to, uint256 _amount) internal {
         ERC20Mock(_token).mint(_to, _amount);
     }
 
-    function _depositCollateral(
-        address user,
-        address token,
-        uint256 amount
-    ) internal {
+    function _depositCollateral(address user, address token, uint256 amount) internal {
         switchSigner(user);
         if (token == ETH_CONTRACT_ADDRESS) {
             vm.deal(user, amount);
-            SharedFacet(address(diamond)).depositCollateral{value: amount}(
-                token,
-                amount
-            );
+            SharedFacet(address(diamond)).depositCollateral{value: amount}(token, amount);
             return;
         }
         IERC20(token).approve(address(protocolFacet), type(uint256).max);
         SharedFacet(address(diamond)).depositCollateral(token, amount);
     }
 
-    function deployERC20ContractAndAddPriceFeed(
-        string memory _name,
-        uint8 _decimals,
-        int256 _initialAnswer
-    ) internal returns (address, address) {
+    function deployERC20ContractAndAddPriceFeed(string memory _name, uint8 _decimals, int256 _initialAnswer)
+        internal
+        returns (address, address)
+    {
         ERC20Mock _erc20 = new ERC20Mock();
-        MockV3Aggregator _priceFeed = new MockV3Aggregator(
-            _decimals,
-            _initialAnswer * 1e8
-        );
+        MockV3Aggregator _priceFeed = new MockV3Aggregator(_decimals, _initialAnswer * 1e8);
         vm.label(address(_priceFeed), "Price Feed");
         vm.label(address(_erc20), _name);
         return (address(_erc20), address(_priceFeed));
@@ -175,16 +149,9 @@ contract ProtocolTest is Test, IDiamondCut {
         _mintTokenToAddress(USDT_CONTRACT_ADDRESS, B, 100000e6);
         _depositCollateral(owner, WETH_CONTRACT_ADDRESS, 5e18);
 
-        protocolFacet.createLendingRequest(
-            200e6,
-            500,
-            block.timestamp + (30 days * 3),
-            USDT_CONTRACT_ADDRESS
-        );
+        protocolFacet.createLendingRequest(200e6, 500, block.timestamp + (30 days * 3), USDT_CONTRACT_ADDRESS);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(Protocol__RequestNotServiced.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Protocol__RequestNotServiced.selector));
         protocolFacet.liquidateUserRequest(1);
     }
 
@@ -192,20 +159,13 @@ contract ProtocolTest is Test, IDiamondCut {
         _mintTokenToAddress(USDT_CONTRACT_ADDRESS, B, 100000e6);
         _depositCollateral(owner, WETH_CONTRACT_ADDRESS, 200e18);
 
-        protocolFacet.createLendingRequest(
-            200e6,
-            500,
-            block.timestamp + (30 days * 3),
-            USDT_CONTRACT_ADDRESS
-        );
+        protocolFacet.createLendingRequest(200e6, 500, block.timestamp + (30 days * 3), USDT_CONTRACT_ADDRESS);
 
         switchSigner(B);
         ERC20Mock(USDT_CONTRACT_ADDRESS).approve(address(diamond), 200e6);
         protocolFacet.serviceRequest(1, USDT_CONTRACT_ADDRESS);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(Protocol__NotLiquidatable.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Protocol__NotLiquidatable.selector));
         protocolFacet.liquidateUserRequest(1);
     }
 
@@ -213,12 +173,7 @@ contract ProtocolTest is Test, IDiamondCut {
         _mintTokenToAddress(USDT_CONTRACT_ADDRESS, B, 100000e6);
         _depositCollateral(owner, WETH_CONTRACT_ADDRESS, 200e18);
 
-        protocolFacet.createLendingRequest(
-            200e6,
-            500,
-            block.timestamp + (30 days * 3),
-            USDT_CONTRACT_ADDRESS
-        );
+        protocolFacet.createLendingRequest(200e6, 500, block.timestamp + (30 days * 3), USDT_CONTRACT_ADDRESS);
 
         switchSigner(B);
         ERC20Mock(USDT_CONTRACT_ADDRESS).approve(address(diamond), 200e6);
@@ -226,9 +181,7 @@ contract ProtocolTest is Test, IDiamondCut {
 
         vm.warp(block.timestamp + (30 days * 3) + 1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(Protocol__NotLiquidatable.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Protocol__NotLiquidatable.selector));
         protocolFacet.liquidateUserRequest(1);
     }
 
@@ -236,12 +189,7 @@ contract ProtocolTest is Test, IDiamondCut {
         _mintTokenToAddress(USDT_CONTRACT_ADDRESS, B, 100000e6);
         _depositCollateral(owner, WETH_CONTRACT_ADDRESS, 200e18);
 
-        protocolFacet.createLendingRequest(
-            200e6,
-            500,
-            block.timestamp + (30 days * 3),
-            USDT_CONTRACT_ADDRESS
-        );
+        protocolFacet.createLendingRequest(200e6, 500, block.timestamp + (30 days * 3), USDT_CONTRACT_ADDRESS);
 
         switchSigner(B);
         ERC20Mock(USDT_CONTRACT_ADDRESS).approve(address(diamond), 200e6);
@@ -261,24 +209,14 @@ contract ProtocolTest is Test, IDiamondCut {
         _mintTokenToAddress(USDT_CONTRACT_ADDRESS, B, 100000e6);
         _depositCollateral(owner, WETH_CONTRACT_ADDRESS, 200e18);
 
-        protocolFacet.createLendingRequest(
-            200e6,
-            500,
-            block.timestamp + (30 days * 3),
-            USDT_CONTRACT_ADDRESS
-        );
+        protocolFacet.createLendingRequest(200e6, 500, block.timestamp + (30 days * 3), USDT_CONTRACT_ADDRESS);
 
         switchSigner(B);
-        ERC20Mock(USDT_CONTRACT_ADDRESS).approve(
-            address(diamond),
-            type(uint256).max
-        );
+        ERC20Mock(USDT_CONTRACT_ADDRESS).approve(address(diamond), type(uint256).max);
         protocolFacet.serviceRequest(1, USDT_CONTRACT_ADDRESS);
 
         switchSigner(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(Protocol__OwnerCantLiquidateRequest.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Protocol__OwnerCantLiquidateRequest.selector));
         protocolFacet.liquidateUserRequest(1);
     }
 
@@ -286,18 +224,9 @@ contract ProtocolTest is Test, IDiamondCut {
         _mintTokenToAddress(USDT_CONTRACT_ADDRESS, B, 100000e6);
         _depositCollateral(owner, WETH_CONTRACT_ADDRESS, 200e18);
 
-        assertEq(
-            IERC20(WETH_CONTRACT_ADDRESS).balanceOf(address(diamond)),
-            200e18,
-            "Diamond should hold 200 WETH"
-        );
+        assertEq(IERC20(WETH_CONTRACT_ADDRESS).balanceOf(address(diamond)), 200e18, "Diamond should hold 200 WETH");
 
-        protocolFacet.createLendingRequest(
-            200e6,
-            500,
-            block.timestamp + (30 days * 3),
-            USDT_CONTRACT_ADDRESS
-        );
+        protocolFacet.createLendingRequest(200e6, 500, block.timestamp + (30 days * 3), USDT_CONTRACT_ADDRESS);
 
         switchSigner(B);
         ERC20Mock(USDT_CONTRACT_ADDRESS).approve(address(diamond), 200e6);
@@ -308,18 +237,11 @@ contract ProtocolTest is Test, IDiamondCut {
 
         switchSigner(C);
         _mintTokenToAddress(USDT_CONTRACT_ADDRESS, C, 300e6);
-        ERC20Mock(USDT_CONTRACT_ADDRESS).approve(
-            address(diamond),
-            type(uint256).max
-        );
+        ERC20Mock(USDT_CONTRACT_ADDRESS).approve(address(diamond), type(uint256).max);
 
-        uint256 lenderBalanceBefore = IERC20(USDT_CONTRACT_ADDRESS).balanceOf(
-            B
-        );
-        uint256 liquidatorBalanceBefore = IERC20(WETH_CONTRACT_ADDRESS)
-            .balanceOf(C);
-        uint256 feeRecipientBalanceBefore = IERC20(WETH_CONTRACT_ADDRESS)
-            .balanceOf(feeRecipent);
+        uint256 lenderBalanceBefore = IERC20(USDT_CONTRACT_ADDRESS).balanceOf(B);
+        uint256 liquidatorBalanceBefore = IERC20(WETH_CONTRACT_ADDRESS).balanceOf(C);
+        uint256 feeRecipientBalanceBefore = IERC20(WETH_CONTRACT_ADDRESS).balanceOf(feeRecipent);
 
         protocolFacet.liquidateUserRequest(1);
 
@@ -575,9 +497,7 @@ contract ProtocolTest is Test, IDiamondCut {
 
     // Unchanged helper functions: generateSelectors, mkaddr, switchSigner, diamondCut
 
-    function generateSelectors(
-        string memory _facetName
-    ) internal returns (bytes4[] memory selectors) {
+    function generateSelectors(string memory _facetName) internal returns (bytes4[] memory selectors) {
         string[] memory cmd = new string[](3);
         cmd[0] = "node";
         cmd[1] = "scripts/genSelectors.js";
@@ -587,9 +507,7 @@ contract ProtocolTest is Test, IDiamondCut {
     }
 
     function mkaddr(string memory name) public returns (address) {
-        address addr = address(
-            uint160(uint256(keccak256(abi.encodePacked(name))))
-        );
+        address addr = address(uint160(uint256(keccak256(abi.encodePacked(name)))));
         vm.label(addr, name);
         return addr;
     }
@@ -604,9 +522,5 @@ contract ProtocolTest is Test, IDiamondCut {
         }
     }
 
-    function diamondCut(
-        FacetCut[] calldata _diamondCut,
-        address _init,
-        bytes calldata _calldata
-    ) external override {}
+    function diamondCut(FacetCut[] calldata _diamondCut, address _init, bytes calldata _calldata) external override {}
 }

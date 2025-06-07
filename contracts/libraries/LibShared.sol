@@ -28,14 +28,8 @@ library LibShared {
     ) internal {
         // Validate the input parameters: `_amountOfCollateral` must be greater than zero,
         // and `_tokenCollateralAddress` must have a valid price feed (non-zero address).
-        Validator._valueMoreThanZero(
-            _amountOfCollateral,
-            _tokenCollateralAddress,
-            msg.value
-        );
-        Validator._isTokenAllowed(
-            _appStorage.s_priceFeeds[_tokenCollateralAddress]
-        );
+        Validator._valueMoreThanZero(_amountOfCollateral, _tokenCollateralAddress, msg.value);
+        Validator._isTokenAllowed(_appStorage.s_priceFeeds[_tokenCollateralAddress]);
 
         // Determine if the collateral is the native token
         bool _isNativeToken = _tokenCollateralAddress == Constants.NATIVE_TOKEN;
@@ -46,28 +40,15 @@ library LibShared {
         }
         // Transfer ERC-20 tokens from the sender to the contract if not the native token
         if (!_isNativeToken) {
-            IERC20(_tokenCollateralAddress).safeTransferFrom(
-                _user,
-                address(this),
-                _amountOfCollateral
-            );
+            IERC20(_tokenCollateralAddress).safeTransferFrom(_user, address(this), _amountOfCollateral);
         }
 
         // Update the user's collateral and available balance in storage
-        _appStorage.s_addressToCollateralDeposited[_user][
-            _tokenCollateralAddress
-        ] += _amountOfCollateral;
-        _appStorage.s_addressToAvailableBalance[_user][
-            _tokenCollateralAddress
-        ] += _amountOfCollateral;
+        _appStorage.s_addressToCollateralDeposited[_user][_tokenCollateralAddress] += _amountOfCollateral;
+        _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress] += _amountOfCollateral;
 
         // Emit an event for the collateral deposit
-        emit CollateralDeposited(
-            _user,
-            _tokenCollateralAddress,
-            _amountOfCollateral,
-            _chainSelector
-        );
+        emit CollateralDeposited(_user, _tokenCollateralAddress, _amountOfCollateral, _chainSelector);
     }
 
     /**
@@ -84,15 +65,11 @@ library LibShared {
         uint64 _chainSelector
     ) internal {
         // Validate that the token is allowed and the amount is greater than zero
-        Validator._isTokenAllowed(
-            _appStorage.s_priceFeeds[_tokenCollateralAddress]
-        );
+        Validator._isTokenAllowed(_appStorage.s_priceFeeds[_tokenCollateralAddress]);
         Validator._moreThanZero(_amount);
 
         // Retrieve the user's deposited amount for the specified token
-        uint256 depositedAmount = _appStorage.s_addressToAvailableBalance[
-            _user
-        ][_tokenCollateralAddress];
+        uint256 depositedAmount = _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress];
 
         // Check if the user has sufficient collateral to withdraw the requested amount
         if (depositedAmount < _amount) {
@@ -100,17 +77,13 @@ library LibShared {
         }
 
         // Update storage to reflect the withdrawal of collateral
-        _appStorage.s_addressToCollateralDeposited[_user][
-            _tokenCollateralAddress
-        ] -= _amount;
-        _appStorage.s_addressToAvailableBalance[_user][
-            _tokenCollateralAddress
-        ] -= _amount;
+        _appStorage.s_addressToCollateralDeposited[_user][_tokenCollateralAddress] -= _amount;
+        _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress] -= _amount;
 
         // Handle withdrawal for native token vs ERC20 tokens
         if (_tokenCollateralAddress == Constants.NATIVE_TOKEN) {
             // Transfer native token to the user
-            (bool sent, ) = payable(_user).call{value: _amount}("");
+            (bool sent,) = payable(_user).call{value: _amount}("");
             if (!sent) revert Protocol__TransferFailed();
         } else {
             // Transfer ERC20 token to the user
@@ -118,11 +91,6 @@ library LibShared {
         }
 
         // Emit an event indicating successful collateral withdrawal
-        emit CollateralWithdrawn(
-            _user,
-            _tokenCollateralAddress,
-            _amount,
-            _chainSelector
-        );
+        emit CollateralWithdrawn(_user, _tokenCollateralAddress, _amount, _chainSelector);
     }
 }

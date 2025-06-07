@@ -15,9 +15,6 @@ import {LibInterestRateModel} from "./LibInterestRateModel.sol";
 import {LibRateCalculations} from "./LibRateCalculation.sol";
 import {Utils} from "../utils/functions/Utils.sol";
 
-
-
-
 library LibLiquidityPool {
     using SafeERC20 for IERC20;
 
@@ -48,15 +45,14 @@ library LibLiquidityPool {
         if (!_appStorage.s_protocolPool[_token].isActive) {
             revert ProtocolPool__IsNotActive();
         }
-           // Handle deposit based on token type
+        // Handle deposit based on token type
         if (_token == Constants.NATIVE_TOKEN) {
             require(msg.value == _amount, "Incorrect ETH amount");
-
         } else {
             require(msg.value == 0, "ETH sent with token deposit");
             IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
         }
- 
+
         // Calculate shares based on the amount deposited
         shares = Utils.convertToShares(_appStorage.s_tokenData[_token], _amount);
 
@@ -67,11 +63,14 @@ library LibLiquidityPool {
         _appStorage.s_tokenData[_token].lastUpdateTimestamp = block.timestamp;
         _appStorage.s_addressToUserPoolShare[_user][_token] += shares;
 
+        //update user deposit and with the spoke chain to token to the amount deposited
+        
+
         // Emit an event for the deposit
         emit Deposit(_user, _token, _amount, shares, _chainSelector);
     }
 
-     /**
+    /**
      * @dev Allows users to borrow tokens from the liquidity pool
      * @param _appStorage The app storage layout
      * @param _token The address of the token to borrow
@@ -112,20 +111,13 @@ library LibLiquidityPool {
 
         // Update borrow index to accrue interest
         LibInterestAccure.updateBorrowIndex(tokenData, _protocolPool);
-        
+
         // Verify user has sufficient collateral
         uint8 tokenDecimals = LibGettersImpl._getTokenDecimal(_token);
-        uint256 loanUsdValue = LibGettersImpl._getUsdValue(
-            _appStorage,
-            _token,
-            _amount,
-            tokenDecimals
-        );
+        uint256 loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, _token, _amount, tokenDecimals);
 
         // Check health factor after potential borrow
-        if (
-            LibGettersImpl._healthFactor(_appStorage, _user, loanUsdValue) < 1e18
-        ) {
+        if (LibGettersImpl._healthFactor(_appStorage, _user, loanUsdValue) < 1e18) {
             revert ProtocolPool__InsufficientCollateral();
         }
 
@@ -154,7 +146,7 @@ library LibLiquidityPool {
 
         // Transfer tokens to the user
         if (_token == Constants.NATIVE_TOKEN) {
-            (bool success, ) = payable(_user).call{value: _amount}("");
+            (bool success,) = payable(_user).call{value: _amount}("");
             require(success, "ETH transfer failed");
         } else {
             IERC20(_token).safeTransfer(_user, _amount);
@@ -219,9 +211,7 @@ library LibLiquidityPool {
 
             // Refund excess ETH if any
             if (msg.value > amountRepaid) {
-                (bool success, ) = payable(_user).call{
-                    value: msg.value - amountRepaid
-                }("");
+                (bool success,) = payable(_user).call{value: msg.value - amountRepaid}("");
                 require(success, "ETH refund failed");
             }
         } else {
@@ -290,7 +280,7 @@ library LibLiquidityPool {
 
         // Ensure pool has liquidity
         if (tokenData.poolLiquidity == 0) revert ProtocolPool__NoLiquidity();
-        
+
         // Update borrow index to accrue interest before withdrawal
         LibInterestAccure.updateBorrowIndex(tokenData, protocolPool);
 
@@ -310,7 +300,7 @@ library LibLiquidityPool {
 
         // Transfer tokens to user
         if (_token == Constants.NATIVE_TOKEN) {
-            (bool success, ) = payable(_user).call{value: _amount}("");
+            (bool success,) = payable(_user).call{value: _amount}("");
             require(success, "ETH transfer failed");
         } else {
             IERC20(_token).safeTransfer(_user, _amount);
@@ -328,16 +318,16 @@ library LibLiquidityPool {
      * @param userBorrowData The user's borrow data
      * @return The current debt amount including interest
      */
-    function _calculateUserDebt(
-        TokenData memory tokenData,
-        UserBorrowData memory userBorrowData
-    ) internal pure returns (uint256) {
+    function _calculateUserDebt(TokenData memory tokenData, UserBorrowData memory userBorrowData)
+        internal
+        pure
+        returns (uint256)
+    {
         if (userBorrowData.borrowedAmount == 0) return 0;
 
         // Calculate the ratio between current index and user's borrow index
         // This represents how much interest has accumulated since user borrowed
-        uint256 currentDebt = (userBorrowData.borrowedAmount * tokenData.borrowIndex) / 
-                             userBorrowData.borrowIndex;
+        uint256 currentDebt = (userBorrowData.borrowedAmount * tokenData.borrowIndex) / userBorrowData.borrowIndex;
 
         return currentDebt;
     }
@@ -376,10 +366,14 @@ library LibLiquidityPool {
             uint256 userBalance = _appStorage.s_addressToCollateralDeposited[_user][token];
 
             // Calculate the amount to lock in USD for each token based on the proportional collateral
-            uint256 amountToLockUSD = (LibGettersImpl._getUsdValue(_appStorage, token, userBalance, _decimalToken) * collateralToLock) / 100;
+            uint256 amountToLockUSD =
+                (LibGettersImpl._getUsdValue(_appStorage, token, userBalance, _decimalToken) * collateralToLock) / 100;
 
             // Convert USD amount to token amount and apply the correct decimal scaling
-            uint256 amountToLock = ((((amountToLockUSD) * 10) / LibGettersImpl._getUsdValue(_appStorage, token, 10, 0)) * (10 ** _decimalToken)) / (Constants.PRECISION);
+            uint256 amountToLock = (
+                (((amountToLockUSD) * 10) / LibGettersImpl._getUsdValue(_appStorage, token, 10, 0))
+                    * (10 ** _decimalToken)
+            ) / (Constants.PRECISION);
 
             _appStorage.s_addressToAvailableBalance[_user][token] -= amountToLock;
 
@@ -422,10 +416,14 @@ library LibLiquidityPool {
             uint256 userBalance = _appStorage.s_addressToCollateralDeposited[_user][token];
 
             // Calculate the amount to unlock in USD for each token based on the proportional collateral
-            uint256 amountToUnlockUSD = (LibGettersImpl._getUsdValue(_appStorage, token, userBalance, _decimalToken) * collateralToUnlock) / 100;
+            uint256 amountToUnlockUSD =
+                (LibGettersImpl._getUsdValue(_appStorage, token, userBalance, _decimalToken) * collateralToUnlock) / 100;
 
             // Convert USD amount to token amount and apply the correct decimal scaling
-            uint256 amountToUnlock = ((((amountToUnlockUSD) * 10) / LibGettersImpl._getUsdValue(_appStorage, token, 10, 0)) * (10 ** _decimalToken)) / (Constants.PRECISION);
+            uint256 amountToUnlock = (
+                (((amountToUnlockUSD) * 10) / LibGettersImpl._getUsdValue(_appStorage, token, 10, 0))
+                    * (10 ** _decimalToken)
+            ) / (Constants.PRECISION);
 
             _appStorage.s_addressToAvailableBalance[_user][token] += amountToUnlock;
 
@@ -439,10 +437,7 @@ library LibLiquidityPool {
      * @param _appStorage The app storage layout
      * @param _user Address of the user whose collateral should be fully unlocked
      */
-    function _unlockAllCollateral(
-        LibAppStorage.Layout storage _appStorage,
-        address _user
-    ) internal {
+    function _unlockAllCollateral(LibAppStorage.Layout storage _appStorage, address _user) internal {
         address[] memory _collateralTokens = LibGettersImpl._getUserCollateralTokens(_appStorage, _user);
 
         for (uint256 i = 0; i < _collateralTokens.length; i++) {
@@ -460,4 +455,3 @@ library LibLiquidityPool {
         }
     }
 }
-
