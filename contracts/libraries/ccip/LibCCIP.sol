@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
-import {LibShared} from "../LibShared.sol";
 import {LibProtocol} from "../LibProtocol.sol";
 import {CCIPMessageType} from "../../model/Protocol.sol";
 import {LibAppStorage} from "../LibAppStorage.sol";
@@ -10,9 +9,10 @@ import {IRouterClient} from "@chainlink/contracts-ccip/contracts/interfaces/IRou
 import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Constants} from "../../utils/constants/Constant.sol";
+import {LibxShared} from "./LibxShared.sol";
 
 library LibCCIP {
-    using LibShared for LibAppStorage.Layout;
+    using LibxShared for LibAppStorage.Layout;
     using LibProtocol for LibAppStorage.Layout;
 
     function _resolveCCIPMessage(
