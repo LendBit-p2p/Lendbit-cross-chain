@@ -190,4 +190,12 @@ contract SpokeContract {
     ) external {
         //TODO: // Currently Working on the Todo
     }
+
+    //////////////////
+    ///// GETTERS ////
+    //////////////////
+    function getFees() public view returns (uint256) {
+        //TODO: // Currently Working on the Todo
+        return 0;
+    }
 }
