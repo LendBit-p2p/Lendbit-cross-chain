@@ -9,7 +9,7 @@ import {IRouterClient} from "@chainlink/contracts-ccip/contracts/interfaces/IRou
 import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
 import {CCIPReceiver} from "@chainlink/contracts-ccip/contracts/applications/CCIPReceiver.sol";
 import {Validitions} from "./libraries/Validitions.sol";
-import {CCIPMessageSent} from "./libraries/Events.sol";
+import {CCIPMessageSent, CCIPMessageExecuted} from "./libraries/Events.sol";
 import "./libraries/Errors.sol";
 
 contract SpokeContract is CCIPReceiver {
@@ -358,17 +358,44 @@ contract SpokeContract is CCIPReceiver {
     function _ccipReceive(
         Client.Any2EVMMessage memory message
     ) internal override {
-        (CCIPMessageType messageType, bytes memory data) = abi.decode(
+        address _sender = abi.decode(message.sender, (address));
+        if (
+            _sender != i_hub || message.sourceChainSelector != i_chainSelector
+        ) {
+            revert Spoke__NotHub();
+        }
+
+        (bool _isNative, , address _receiver) = abi.decode(
             message.data,
-            (CCIPMessageType, bytes)
+            (bool, Client.EVMTokenAmount[], address)
         );
 
-        if (messageType == CCIPMessageType.DEPOSIT_COLLATERAL) {
-            (
-                address tokenCollateralAddress,
-                uint256 amountOfCollateral,
-                address sender
-            ) = abi.decode(data, (address, uint256, address));
+        Client.EVMTokenAmount[] memory _destTokenAmounts = message
+            .destTokenAmounts;
+
+        if (_isNative) {
+            i_weth.withdraw(_destTokenAmounts[0].amount);
+            (bool success, ) = _receiver.call{
+                value: _destTokenAmounts[0].amount
+            }("");
+
+            if (!success) {
+                revert Spoke__TransferFailed();
+            }
+        } else {
+            IERC20(_destTokenAmounts[0].token).safeTransfer(
+                _receiver,
+                _destTokenAmounts[0].amount
+            );
         }
+
+        s_isMessageExecuted[message.messageId] = true;
+
+        emit CCIPMessageExecuted(
+            message.messageId,
+            i_chainSelector,
+            _receiver,
+            _destTokenAmounts
+        );
     }
 }
