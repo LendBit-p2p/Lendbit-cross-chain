@@ -5,9 +5,9 @@ import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interface
 import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.sol";
 import {IERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IRouterClient} from "@chainlink/contracts-ccip/contracts/interfaces/IRouterClient.sol";
-import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
-import {CCIPReceiver} from "@chainlink/contracts-ccip/contracts/applications/CCIPReceiver.sol";
+import {IRouterClient} from "@chainlink/contract-ccip/contracts/interfaces/IRouterClient.sol";
+import {Client} from "@chainlink/contract-ccip/contracts/libraries/Client.sol";
+import {CCIPReceiver} from "@chainlink/contract-ccip/contracts/applications/CCIPReceiver.sol";
 import {Validitions} from "./libraries/Validitions.sol";
 import {CCIPMessageSent, CCIPMessageExecuted} from "./libraries/Events.sol";
 import "./libraries/Errors.sol";
@@ -338,7 +338,7 @@ contract SpokeContract is CCIPReceiver {
         );
     }
 
-    function _addToken(address _token, address _hubToken) internal {
+    function addToken(address _token, address _hubToken) external {
         s_isTokenSupported[_token] = true;
         s_tokenToHubTokens[_token] = _hubToken;
     }

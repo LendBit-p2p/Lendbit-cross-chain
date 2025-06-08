@@ -2,10 +2,13 @@
 src = 'contracts'
 out = 'out'
 --via-ir = true
-libs = [
-    'lib'
-]
-ffi=true
-verbosity=5
+libs = ['lib']
+ffi = true
+verbosity = 5
+
+[rpc_endpoints]
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+arbitrum_sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
+avax_sepolia = "${AVAX_SEPOLIA_RPC_URL}"
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
