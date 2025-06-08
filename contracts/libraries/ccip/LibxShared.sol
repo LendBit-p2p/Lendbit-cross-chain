@@ -12,7 +12,6 @@ import "../LibAppStorage.sol";
 import {LibGettersImpl} from "../LibGetters.sol";
 import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.sol";
 import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
-import {LibCCIP} from "./LibCCIP.sol";
 
 library LibxShared {
     using SafeERC20 for IERC20;
@@ -59,7 +58,7 @@ library LibxShared {
         uint256 _amount,
         address _user,
         uint64 _chainSelector
-    ) internal {
+    ) internal returns (address, bool, Client.EVMTokenAmount[] memory) {
         // Retrieve the user's deposited amount for the specified token
         uint256 depositedAmount = _appStorage.s_addressToAvailableBalance[
             _user
@@ -99,28 +98,18 @@ library LibxShared {
             );
         }
 
-        //Handle Sending Of Token Crosschain.
-        bytes32 messageId = LibCCIP._sendTokenCrosschain(
-            _appStorage.s_senderSupported[_chainSelector],
-            _tokenCollateralAddress == Constants.NATIVE_TOKEN,
-            tokensToSendDetails,
-            _chainSelector,
-            _user
-        );
-
-        emit CCIPMessageSent(
-            messageId,
-            _chainSelector,
-            abi.encode(_user),
-            tokensToSendDetails
-        );
-
         // Emit an event indicating successful collateral withdrawal
         emit CollateralWithdrawn(
             _user,
             _tokenCollateralAddress,
             _amount,
             _chainSelector
+        );
+
+        return (
+            _appStorage.s_senderSupported[_chainSelector],
+            _tokenCollateralAddress == Constants.NATIVE_TOKEN,
+            tokensToSendDetails
         );
     }
 }

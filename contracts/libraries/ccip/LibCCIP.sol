@@ -10,6 +10,7 @@ import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.s
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Constants} from "../../utils/constants/Constant.sol";
 import {LibxShared} from "./LibxShared.sol";
+import {CCIPMessageSent} from "../../model/Event.sol";
 
 library LibCCIP {
     using LibxShared for LibAppStorage.Layout;
@@ -144,11 +145,30 @@ library LibCCIP {
                 _messageData,
                 (address, uint256, address)
             );
-            _appStorage._withdrawCollateral(
-                _token,
-                _amount,
-                _user,
-                _sourceChainSelector
+            (
+                address receiver,
+                bool isNative,
+                Client.EVMTokenAmount[] memory destTokenAmounts
+            ) = _appStorage._withdrawCollateral(
+                    _token,
+                    _amount,
+                    _user,
+                    _sourceChainSelector
+                );
+
+            bytes32 messageId = _sendTokenCrosschain(
+                receiver,
+                isNative,
+                destTokenAmounts,
+                _sourceChainSelector,
+                _user
+            );
+
+            emit CCIPMessageSent(
+                messageId,
+                _sourceChainSelector,
+                abi.encode(_user),
+                destTokenAmounts
             );
         }
     }
