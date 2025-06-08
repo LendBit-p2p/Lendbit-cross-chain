@@ -5,7 +5,7 @@ import "../contracts/interfaces/IDiamondCut.sol";
 import "../contracts/facets/DiamondCutFacet.sol";
 import "../contracts/facets/DiamondLoupeFacet.sol";
 import "../contracts/facets/OwnershipFacet.sol";
-import {SharedFacet} from "../contracts/facets/SharedFacets.sol";
+import {SharedFacet} from "../contracts/facets/SharedFacet.sol";
 import "forge-std/Test.sol";
 import "../contracts/Diamond.sol";
 import "../contracts/facets/ProtocolFacet.sol";
