@@ -21,6 +21,10 @@ contract SpokeContract is CCIPReceiver {
     LinkTokenInterface immutable i_link;
     IWERC20 immutable i_weth;
 
+    mapping(address => bool) public s_isTokenSupported;
+    mapping(address => address) public s_tokenToHubTokens;
+    mapping(bytes32 => bool) public s_isMessageExecuted;
+
     //enum for the CCIP message type
     enum CCIPMessageType {
         DEPOSIT,
@@ -201,6 +205,10 @@ contract SpokeContract is CCIPReceiver {
         address _tokenCollateralAddress,
         uint256 _amountOfCollateral
     ) external payable {
+        if (!s_isTokenSupported[_tokenCollateralAddress]) {
+            revert Spoke__TokenNotSupported();
+        }
+
         Validitions.validateTokenParams(
             _tokenCollateralAddress,
             _amountOfCollateral
@@ -281,6 +289,11 @@ contract SpokeContract is CCIPReceiver {
         uint256 _amountOfCollateral
     ) external {
         //TODO: // Currently Working on the Todo
+    }
+
+    function _addToken(address _token, address _hubToken) internal {
+        s_isTokenSupported[_token] = true;
+        s_tokenToHubTokens[_token] = _hubToken;
     }
 
     //////////////////
