@@ -11,7 +11,7 @@ import "../../utils/constants/Constant.sol";
 import "../LibAppStorage.sol";
 import {LibGettersImpl} from "../LibGetters.sol";
 import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.sol";
-import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
+import {Client} from "@chainlink/contract-ccip/contracts/libraries/Client.sol";
 import {LibCCIP} from "./LibCCIP.sol";
 
 library LibxShared {

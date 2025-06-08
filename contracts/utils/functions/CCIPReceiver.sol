@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {IAny2EVMMessageReceiver} from "@chainlink/contracts-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMMessageReceiver} from "@chainlink/contract-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
 
-import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
+import {Client} from "@chainlink/contract-ccip/contracts/libraries/Client.sol";
 
 import {Constants} from "../constants/Constant.sol";
 import {AppStorage} from "./AppStorage.sol";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.20;
 
-import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
+import {Client} from "@chainlink/contract-ccip/contracts/libraries/Client.sol";
 
 event RequestCreated(
     address indexed _borrower,
@@ -128,7 +128,7 @@ event Deposit(
     address indexed user,
     address indexed token,
     uint256 amount,
-    uint256 sharesMinted, 
+    uint256 sharesMinted,
     uint64 chainSelector
 );
 
@@ -167,7 +167,13 @@ event Repay(
     uint64 chainSelector
 );
 
-event Withdraw(address indexed sender,address indexed token,uint256 amountWithdrawn,uint256 shares, uint64 chainSelector);
+event Withdraw(
+    address indexed sender,
+    address indexed token,
+    uint256 amountWithdrawn,
+    uint256 shares,
+    uint64 chainSelector
+);
 
 event Repay(
     address indexed sender,
