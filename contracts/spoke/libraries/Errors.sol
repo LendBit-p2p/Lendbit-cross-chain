@@ -7,3 +7,6 @@ error Spoke__InvalidCollateralToken();
 error Spoke__InvalidToken();
 error Spoke__InsufficientNativeCollateral();
 error Spoke__InsufficientFee();
+error Spoke__TokenNotSupported();
+error Spoke__NotHub();
+error Spoke__TransferFailed();

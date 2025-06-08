@@ -9,7 +9,7 @@ import {IRouterClient} from "@chainlink/contracts-ccip/contracts/interfaces/IRou
 import {Client} from "@chainlink/contracts-ccip/contracts/libraries/Client.sol";
 import {CCIPReceiver} from "@chainlink/contracts-ccip/contracts/applications/CCIPReceiver.sol";
 import {Validitions} from "./libraries/Validitions.sol";
-import {CCIPMessageSent} from "./libraries/Events.sol";
+import {CCIPMessageSent, CCIPMessageExecuted} from "./libraries/Events.sol";
 import "./libraries/Errors.sol";
 
 contract SpokeContract is CCIPReceiver {
@@ -20,6 +20,10 @@ contract SpokeContract is CCIPReceiver {
     uint64 immutable i_chainSelector;
     LinkTokenInterface immutable i_link;
     IWERC20 immutable i_weth;
+
+    mapping(address => bool) public s_isTokenSupported;
+    mapping(address => address) public s_tokenToHubTokens;
+    mapping(bytes32 => bool) public s_isMessageExecuted;
 
     //enum for the CCIP message type
     enum CCIPMessageType {
@@ -201,6 +205,10 @@ contract SpokeContract is CCIPReceiver {
         address _tokenCollateralAddress,
         uint256 _amountOfCollateral
     ) external payable {
+        if (!s_isTokenSupported[_tokenCollateralAddress]) {
+            revert Spoke__TokenNotSupported();
+        }
+
         Validitions.validateTokenParams(
             _tokenCollateralAddress,
             _amountOfCollateral
@@ -279,8 +287,60 @@ contract SpokeContract is CCIPReceiver {
     function withdrawCollateral(
         address _tokenCollateralAddress,
         uint256 _amountOfCollateral
-    ) external {
-        //TODO: // Currently Working on the Todo
+    ) external payable {
+        if (!s_isTokenSupported[_tokenCollateralAddress]) {
+            revert Spoke__TokenNotSupported();
+        }
+
+        Client.EVMTokenAmount[]
+            memory tokensToSendDetails = new Client.EVMTokenAmount[](0);
+
+        bytes memory messageData = abi.encode(
+            CCIPMessageType.WITHDRAW_COLLATERAL,
+            abi.encode(
+                s_tokenToHubTokens[_tokenCollateralAddress],
+                _amountOfCollateral,
+                msg.sender
+            )
+        );
+
+        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(i_hub),
+            data: messageData,
+            tokenAmounts: tokensToSendDetails,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({
+                    gasLimit: 0,
+                    allowOutOfOrderExecution: true
+                })
+            ),
+            feeToken: address(0)
+        });
+
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(
+            i_chainSelector,
+            message
+        );
+
+        if (msg.value < fee) {
+            revert Spoke__InsufficientFee();
+        }
+
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
+            value: msg.value
+        }(i_chainSelector, message);
+
+        emit CCIPMessageSent(
+            messageId,
+            i_chainSelector,
+            msg.sender,
+            tokensToSendDetails
+        );
+    }
+
+    function _addToken(address _token, address _hubToken) internal {
+        s_isTokenSupported[_token] = true;
+        s_tokenToHubTokens[_token] = _hubToken;
     }
 
     //////////////////
@@ -298,17 +358,44 @@ contract SpokeContract is CCIPReceiver {
     function _ccipReceive(
         Client.Any2EVMMessage memory message
     ) internal override {
-        (CCIPMessageType messageType, bytes memory data) = abi.decode(
+        address _sender = abi.decode(message.sender, (address));
+        if (
+            _sender != i_hub || message.sourceChainSelector != i_chainSelector
+        ) {
+            revert Spoke__NotHub();
+        }
+
+        (bool _isNative, , address _receiver) = abi.decode(
             message.data,
-            (CCIPMessageType, bytes)
+            (bool, Client.EVMTokenAmount[], address)
         );
 
-        if (messageType == CCIPMessageType.DEPOSIT_COLLATERAL) {
-            (
-                address tokenCollateralAddress,
-                uint256 amountOfCollateral,
-                address sender
-            ) = abi.decode(data, (address, uint256, address));
+        Client.EVMTokenAmount[] memory _destTokenAmounts = message
+            .destTokenAmounts;
+
+        if (_isNative) {
+            i_weth.withdraw(_destTokenAmounts[0].amount);
+            (bool success, ) = _receiver.call{
+                value: _destTokenAmounts[0].amount
+            }("");
+
+            if (!success) {
+                revert Spoke__TransferFailed();
+            }
+        } else {
+            IERC20(_destTokenAmounts[0].token).safeTransfer(
+                _receiver,
+                _destTokenAmounts[0].amount
+            );
         }
+
+        s_isMessageExecuted[message.messageId] = true;
+
+        emit CCIPMessageExecuted(
+            message.messageId,
+            i_chainSelector,
+            _receiver,
+            _destTokenAmounts
+        );
     }
 }

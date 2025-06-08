@@ -16,3 +16,10 @@ event CCIPMessageFailed(
     bytes indexed sender,
     Client.EVMTokenAmount[] destTokenAmounts
 );
+
+event CCIPMessageExecuted(
+    bytes32 indexed messageId,
+    uint64 indexed sourceChainSelector,
+    address indexed receiver,
+    Client.EVMTokenAmount[] destTokenAmounts
+);
