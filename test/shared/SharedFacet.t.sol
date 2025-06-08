@@ -46,4 +46,32 @@ contract SharedFacetTest is Base {
             0
         );
     }
+
+    function test_depositNativeCollateral() public {
+        uint256 amount = 100 ether;
+        _depositNativeCollateral(owner, amount);
+
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            ETH_CONTRACT_ADDRESS
+        );
+
+        assertEq(userBalance, amount);
+        assertEq(address(sharedFacet).balance, amount);
+    }
+
+    function test_withdrawNativeCollateral() public {
+        uint256 amount = 100 ether;
+        _depositNativeCollateral(owner, amount);
+
+        sharedFacet.withdrawCollateral(ETH_CONTRACT_ADDRESS, amount);
+
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            ETH_CONTRACT_ADDRESS
+        );
+
+        assertEq(userBalance, 0);
+        assertEq(address(sharedFacet).balance, 0);
+    }
 }

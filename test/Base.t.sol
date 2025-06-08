@@ -204,6 +204,14 @@ contract Base is Test, IDiamondCut {
         sharedFacet.depositCollateral(_token, _amount);
     }
 
+    function _depositNativeCollateral(address _user, uint256 _amount) public {
+        vm.deal(_user, _amount);
+        sharedFacet.depositCollateral{value: _amount}(
+            ETH_CONTRACT_ADDRESS,
+            _amount
+        );
+    }
+
     function generateSelectors(
         string memory _facetName
     ) internal returns (bytes4[] memory selectors) {
