@@ -28,6 +28,7 @@ contract Base is Test, IDiamondCut {
     GettersFacet gettersFacet;
     CcipFacet ccipFacet;
     SharedFacet sharedFacet;
+    uint64 HUB_CHAIN_SELECTOR = 10344971235874465080;
 
     // SPOKEs
     SpokeContract arbSpokeContract;
@@ -204,7 +205,6 @@ contract Base is Test, IDiamondCut {
         arbFork = vm.createFork(SPOKE_ARB_RPC_URL);
         avaxFork = vm.createFork(SPOKE_AVAX_RPC_URL);
 
-        owner = address(0x4a3aF8C69ceE81182A9E74b2392d4bDc616Bf7c7);
         switchSigner(owner);
 
         ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
@@ -307,8 +307,9 @@ contract Base is Test, IDiamondCut {
         liquidityPoolFacet = LiquidityPoolFacet(address(diamond));
         ccipFacet = CcipFacet(address(diamond));
         sharedFacet = SharedFacet(address(diamond));
+        ownerF = OwnershipFacet(address(diamond));
 
-        OwnershipFacet(address(diamond)).setFeeRate(100);
+        ownerF.setFeeRate(100);
 
         vm.selectFork(arbFork);
         Register.NetworkDetails
@@ -317,7 +318,7 @@ contract Base is Test, IDiamondCut {
             );
         arbSpokeContract = new SpokeContract(
             address(diamond),
-            arbNetworkDetails.chainSelector,
+            HUB_CHAIN_SELECTOR,
             arbNetworkDetails.linkAddress,
             arbNetworkDetails.routerAddress,
             arbNetworkDetails.wrappedNativeAddress
@@ -342,7 +343,7 @@ contract Base is Test, IDiamondCut {
                 .getNetworkDetails(block.chainid);
         avaxSpokeContract = new SpokeContract(
             address(diamond),
-            avaxNetworkDetails.chainSelector,
+            HUB_CHAIN_SELECTOR,
             avaxNetworkDetails.linkAddress,
             avaxNetworkDetails.routerAddress,
             avaxNetworkDetails.wrappedNativeAddress
@@ -362,11 +363,11 @@ contract Base is Test, IDiamondCut {
         avaxSpokeContract.addToken(ETH_CONTRACT_ADDRESS, ETH_CONTRACT_ADDRESS);
 
         vm.selectFork(hubFork);
-        OwnershipFacet(address(diamond)).addSupportedChain(
+        ownerF.addSupportedChain(
             arbNetworkDetails.chainSelector,
             address(arbSpokeContract)
         );
-        OwnershipFacet(address(diamond)).addSupportedChain(
+        ownerF.addSupportedChain(
             avaxNetworkDetails.chainSelector,
             address(avaxSpokeContract)
         );
@@ -404,6 +405,40 @@ contract Base is Test, IDiamondCut {
         sharedFacet.depositCollateral(_token, _amount);
     }
 
+    function _xDepositCollateral(
+        address _token,
+        uint256 _amount,
+        uint256 _fork,
+        address _user
+    ) public {
+        if (_token == ETH_CONTRACT_ADDRESS) {
+            revert("ETH is not supported use _xDepositNativeCollateral");
+        }
+        if (_fork == hubFork) {
+            _depositCollateral(_token, _amount);
+            return;
+        }
+
+        if (_fork == arbFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, 1 ether);
+            ERC20Mock(_token).approve(address(arbSpokeContract), _amount);
+            arbSpokeContract.depositCollateral{value: 1 ether}(_token, _amount);
+        }
+
+        if (_fork == avaxFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, 1 ether);
+            ERC20Mock(_token).approve(address(avaxSpokeContract), _amount);
+            avaxSpokeContract.depositCollateral{value: 1 ether}(
+                _token,
+                _amount
+            );
+        }
+        //give ccipLocalSimulatorFork the ability to route messages
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+    }
+
     function _depositNativeCollateral(address _user, uint256 _amount) public {
         vm.deal(_user, _amount);
         sharedFacet.depositCollateral{value: _amount}(
@@ -439,6 +474,24 @@ contract Base is Test, IDiamondCut {
             vm.stopPrank();
             vm.startPrank(_newSigner);
         }
+    }
+
+    function _dripLink(uint256 _amount, address _user, uint256 _fork) public {
+        vm.startPrank(owner);
+        if (_fork == hubFork) {
+            vm.selectFork(_fork);
+            ERC20Mock(LINK_CONTRACT_ADDRESS).mint(_user, _amount);
+        }
+        if (_fork == arbFork) {
+            vm.selectFork(_fork);
+            ERC20Mock(ARB_LINK_CONTRACT_ADDRESS).mint(_user, _amount);
+        }
+
+        if (_fork == avaxFork) {
+            vm.selectFork(_fork);
+            ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).mint(_user, _amount);
+        }
+        vm.stopPrank();
     }
 
     function diamondCut(
