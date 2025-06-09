@@ -439,6 +439,70 @@ contract Base is Test, IDiamondCut {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
     }
 
+    function _xDepositNativeCollateral(
+        address _user,
+        uint256 _amount,
+        uint256 _fork
+    ) public {
+        if (_fork == hubFork) {
+            _depositNativeCollateral(_user, _amount);
+            return;
+        }
+
+        if (_fork == arbFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, _amount + 1 ether);
+            arbSpokeContract.depositCollateral{value: _amount + 1 ether}(
+                ETH_CONTRACT_ADDRESS,
+                _amount
+            );
+        }
+
+        if (_fork == avaxFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, _amount + 1 ether);
+            avaxSpokeContract.depositCollateral{value: _amount + 1 ether}(
+                ETH_CONTRACT_ADDRESS,
+                _amount
+            );
+        }
+        //give ccipLocalSimulatorFork the ability to route messages
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+    }
+
+    function _xWithdrawCollateral(
+        address _token,
+        uint256 _amount,
+        uint256 _fork,
+        address _user
+    ) public {
+        if (_fork == hubFork) {
+            sharedFacet.withdrawCollateral(_token, _amount);
+            return;
+        }
+
+        if (_fork == arbFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, 1 ether);
+            arbSpokeContract.withdrawCollateral{value: 1 ether}(
+                _token,
+                _amount
+            );
+        }
+
+        if (_fork == avaxFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, 1 ether);
+            avaxSpokeContract.withdrawCollateral{value: 1 ether}(
+                _token,
+                _amount
+            );
+        }
+        //give ccipLocalSimulatorFork the ability to route messages
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(_fork);
+    }
+
     function _depositNativeCollateral(address _user, uint256 _amount) public {
         vm.deal(_user, _amount);
         sharedFacet.depositCollateral{value: _amount}(

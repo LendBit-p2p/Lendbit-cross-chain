@@ -275,9 +275,10 @@ contract SpokeContract is CCIPReceiver {
             );
         }
 
-        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
-            value: msg.value
-        }(i_chainSelector, message);
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(
+            i_chainSelector,
+            message
+        );
 
         emit CCIPMessageSent(
             messageId,
@@ -320,7 +321,7 @@ contract SpokeContract is CCIPReceiver {
             tokenAmounts: tokensToSendDetails,
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({
-                    gasLimit: 0,
+                    gasLimit: 300_000,
                     allowOutOfOrderExecution: true
                 })
             ),
