@@ -204,7 +204,7 @@ contract SpokeContract is CCIPReceiver {
     function depositCollateral(
         address _tokenCollateralAddress,
         uint256 _amountOfCollateral
-    ) external payable {
+    ) external payable returns (bytes32) {
         if (!s_isTokenSupported[_tokenCollateralAddress]) {
             revert Spoke__TokenNotSupported();
         }
@@ -259,17 +259,26 @@ contract SpokeContract is CCIPReceiver {
 
         if (_tokenCollateralAddress == NATIVE_TOKEN) {
             i_weth.deposit{value: _amountOfCollateral}();
+            IERC20(address(i_weth)).approve(
+                address(i_ccipRouter),
+                _amountOfCollateral
+            );
         } else {
             IERC20(_tokenCollateralAddress).safeTransferFrom(
                 msg.sender,
                 address(this),
                 _amountOfCollateral
             );
+            IERC20(_tokenCollateralAddress).approve(
+                address(i_ccipRouter),
+                _amountOfCollateral
+            );
         }
 
-        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
-            value: msg.value
-        }(i_chainSelector, message);
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(
+            i_chainSelector,
+            message
+        );
 
         emit CCIPMessageSent(
             messageId,
@@ -277,6 +286,8 @@ contract SpokeContract is CCIPReceiver {
             msg.sender,
             tokensToSendDetails
         );
+
+        return messageId;
     }
 
     /**
@@ -310,7 +321,7 @@ contract SpokeContract is CCIPReceiver {
             tokenAmounts: tokensToSendDetails,
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({
-                    gasLimit: 0,
+                    gasLimit: 300_000,
                     allowOutOfOrderExecution: true
                 })
             ),
@@ -350,6 +361,12 @@ contract SpokeContract is CCIPReceiver {
         Client.EVM2AnyMessage memory message
     ) external view returns (uint256) {
         return IRouterClient(i_ccipRouter).getFee(i_chainSelector, message);
+    }
+
+    function getHubTokenAddress(
+        address _token
+    ) external view returns (address) {
+        return s_tokenToHubTokens[_token];
     }
 
     //////////////////
