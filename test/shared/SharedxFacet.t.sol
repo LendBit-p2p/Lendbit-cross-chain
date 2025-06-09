@@ -48,4 +48,28 @@ contract SharedxFacetTest is Base {
 
         assertEq(userBalance, amount);
     }
+
+    function test_xDepositCollateralBoth() public {
+        uint256 amount = 100 ether;
+        _dripLink(amount, owner, avaxFork);
+
+        vm.startPrank(owner);
+        _xDepositCollateral(
+            AVAX_LINK_CONTRACT_ADDRESS,
+            amount,
+            avaxFork,
+            owner
+        );
+        vm.startPrank(owner);
+        _xDepositCollateral(ARB_LINK_CONTRACT_ADDRESS, amount, arbFork, owner);
+        vm.startPrank(owner);
+        _xDepositCollateral(LINK_CONTRACT_ADDRESS, amount, hubFork, owner);
+
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            LINK_CONTRACT_ADDRESS
+        );
+
+        assertEq(userBalance, amount * 3);
+    }
 }
