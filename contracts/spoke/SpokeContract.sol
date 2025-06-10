@@ -124,21 +124,14 @@ contract SpokeContract is CCIPReceiver {
         uint256 _returnDate,
         address _loanCurrency
     ) external payable returns (bytes32) {
-        if (!s_isTokenSupported[_loanCurrency]) {
+        if (!s_isTokenSupported[_loanCurrency])
             revert Spoke__TokenNotSupported();
-        }
 
-        if (_amount == 0) {
-            revert Spoke__InvalidAmount();
-        }
+        if (_amount == 0) revert Spoke__InvalidAmount();
+        if (_interest == 0) revert Spoke__InvalidInterest();
 
-        if (_interest == 0) {
-            revert Spoke__InvalidInterest();
-        }
-
-        if (_returnDate < block.timestamp + 1 days) {
+        if (_returnDate < block.timestamp + 1 days)
             revert Spoke__DateMustBeInFuture();
-        }
 
         bytes memory messageData = abi.encode(
             CCIPMessageType.CREATE_REQUEST,
