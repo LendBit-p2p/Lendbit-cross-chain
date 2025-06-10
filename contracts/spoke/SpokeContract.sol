@@ -153,7 +153,7 @@ contract SpokeContract is CCIPReceiver {
             tokenAmounts: tokensToSendDetails,
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({
-                    gasLimit: 200_000,
+                    gasLimit: 600_000,
                     allowOutOfOrderExecution: true
                 })
             ),
