@@ -203,7 +203,7 @@ contract SpokeContract is CCIPReceiver {
 
         bytes memory messageData = abi.encode(
             CCIPMessageType.SERVICE_REQUEST,
-            abi.encode(_requestId, msg.sender)
+            abi.encode(_requestId, _tokenAddress == NATIVE_TOKEN, msg.sender)
         );
 
         Client.EVMTokenAmount[]
