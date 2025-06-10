@@ -86,7 +86,7 @@ library LibCCIP {
                 address _user
             ) = abi.decode(
                     _messageData,
-                    (address, uint256, uint256, uint256, address)
+                    (uint256, uint16, uint256, address, address)
                 );
 
             // create the request
