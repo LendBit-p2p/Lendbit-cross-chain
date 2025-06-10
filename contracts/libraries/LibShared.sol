@@ -11,6 +11,7 @@ import "../utils/constants/Constant.sol";
 import "./LibAppStorage.sol";
 import {LibGettersImpl} from "../libraries/LibGetters.sol";
 import {LibInterestAccure} from "./LibInterestAccure.sol";
+import {Constants} from "../utils/constants/Constant.sol";
 
 library LibShared {
     using SafeERC20 for IERC20;
@@ -72,6 +73,12 @@ library LibShared {
         );
     }
 
+
+    function _addressZeroCheck(address _user, address _debtorAddress, address _tokenAddress) internal pure {
+        if (_user == address(0) || _debtorAddress == address(0) || _tokenAddress == address(0)) {
+            revert Protocol__AddressZero();
+        }
+    }
     /**
      * @dev Allows a user to withdraw a specified amount of collateral.
      * @param _tokenCollateralAddress The address of the collateral token to withdraw.
