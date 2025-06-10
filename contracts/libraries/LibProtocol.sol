@@ -38,11 +38,12 @@ library LibProtocol {
      */
     function _createLendingRequest(
         LibAppStorage.Layout storage _appStorage,
-        uint128 _amount,
+        uint256 _amount,
         uint16 _interest,
         uint256 _returnDate,
         address _loanCurrency,
-        uint64 _chainSelector
+        uint64 _chainSelector,
+        address _user
     ) internal {
         // Validate that the loan amount is greater than zero
         Validator._moreThanZero(_amount);
@@ -61,63 +62,98 @@ library LibProtocol {
         uint8 decimal = LibGettersImpl._getTokenDecimal(_loanCurrency);
 
         // Calculate the USD equivalent of the loan amount
-        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, _loanCurrency, _amount, decimal);
+        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(
+            _appStorage,
+            _loanCurrency,
+            _amount,
+            decimal
+        );
 
         // Ensure that the USD value of the loan is valid and meets minimum requirements
         if (_loanUsdValue < 1) revert Protocol__InvalidAmount();
 
         // Get the total USD collateral value for the borrower
-        uint256 collateralValueInLoanCurrency = LibGettersImpl._getAccountCollateralValue(_appStorage, msg.sender);
+        uint256 collateralValueInLoanCurrency = LibGettersImpl
+            ._getAccountCollateralValue(_appStorage, _user);
 
         // Calculate the maximum loanable amount based on available collateral
-        uint256 maxLoanableAmount = Utils.maxLoanableAmount(collateralValueInLoanCurrency);
+        uint256 maxLoanableAmount = Utils.maxLoanableAmount(
+            collateralValueInLoanCurrency
+        );
 
         // Check if the loan exceeds the user's collateral allowance
-        if (_appStorage.addressToUser[msg.sender].totalLoanCollected + _loanUsdValue >= maxLoanableAmount) {
+        if (
+            _appStorage.addressToUser[_user].totalLoanCollected +
+                _loanUsdValue >=
+            maxLoanableAmount
+        ) {
             revert Protocol__InsufficientCollateral();
         }
 
         // Retrieve collateral tokens associated with the borrower
-        address[] memory _collateralTokens = LibGettersImpl._getUserCollateralTokens(_appStorage, msg.sender);
+        address[] memory _collateralTokens = LibGettersImpl
+            ._getUserCollateralTokens(_appStorage, _user);
 
         // Increment the request ID and initialize the new loan request
         _appStorage.requestId = _appStorage.requestId + 1;
-        Request storage _newRequest = _appStorage.request[_appStorage.requestId];
+        Request storage _newRequest = _appStorage.request[
+            _appStorage.requestId
+        ];
         _newRequest.requestId = _appStorage.requestId;
-        _newRequest.author = msg.sender;
+        _newRequest.author = _user;
         _newRequest.amount = _amount;
         _newRequest.interest = _interest;
         _newRequest.returnDate = _returnDate;
-        _newRequest.totalRepayment = Utils.calculateLoanInterest(_returnDate, _amount, _interest);
+        _newRequest.totalRepayment = Utils.calculateLoanInterest(
+            _returnDate,
+            _amount,
+            _interest
+        );
         _newRequest.loanRequestAddr = _loanCurrency;
         _newRequest.collateralTokens = _collateralTokens;
         _newRequest.status = Status.OPEN;
 
         // Calculate the amount of collateral to lock based on the loan value
-        uint256 collateralToLock = Utils.calculateColateralToLock(_loanUsdValue, maxLoanableAmount);
+        uint256 collateralToLock = Utils.calculateColateralToLock(
+            _loanUsdValue,
+            maxLoanableAmount
+        );
 
         // For each collateral token, lock an appropriate amount based on its USD value
         for (uint256 i = 0; i < _collateralTokens.length; i++) {
             address token = _collateralTokens[i];
             uint8 _decimalToken = LibGettersImpl._getTokenDecimal(token);
-            uint256 userBalance = _appStorage.s_addressToCollateralDeposited[msg.sender][token];
+            uint256 userBalance = _appStorage.s_addressToCollateralDeposited[
+                _user
+            ][token];
 
             // Calculate the amount to lock in USD for each token based on the proportional collateral
-            uint256 amountToLockUSD =
-                (LibGettersImpl._getUsdValue(_appStorage, token, userBalance, _decimalToken) * collateralToLock) / 100;
+            uint256 amountToLockUSD = (LibGettersImpl._getUsdValue(
+                _appStorage,
+                token,
+                userBalance,
+                _decimalToken
+            ) * collateralToLock) / 100;
 
             // Convert USD amount to token amount and apply the correct decimal scaling
-            uint256 amountToLock = (
-                (((amountToLockUSD) * 10) / LibGettersImpl._getUsdValue(_appStorage, token, 10, 0))
-                    * (10 ** _decimalToken)
-            ) / (Constants.PRECISION);
+            uint256 amountToLock = ((((amountToLockUSD) * 10) /
+                LibGettersImpl._getUsdValue(_appStorage, token, 10, 0)) *
+                (10 ** _decimalToken)) / (Constants.PRECISION);
 
             // Store the locked amount for each collateral token
-            _appStorage.s_idToCollateralTokenAmount[_appStorage.requestId][token] = amountToLock;
+            _appStorage.s_idToCollateralTokenAmount[_appStorage.requestId][
+                token
+            ] = amountToLock;
         }
 
         // Emit an event for the created loan request
-        emit RequestCreated(msg.sender, _appStorage.requestId, _amount, _interest, _chainSelector);
+        emit RequestCreated(
+            _user,
+            _appStorage.requestId,
+            _amount,
+            _interest,
+            _chainSelector
+        );
     }
 
     /**
@@ -137,10 +173,8 @@ library LibProtocol {
         LibAppStorage.Layout storage _appStorage,
         uint96 _requestId,
         address _tokenAddress,
-        uint64 _chainSelector
-    ) internal 
-    // payable
-    {
+        uint64 _chainSelector // payable
+    ) internal {
         // Validate if native token is being used and msg.value is non-zero
         Validator._nativeMoreThanZero(_tokenAddress, msg.value);
 
@@ -175,46 +209,84 @@ library LibProtocol {
             if (IERC20(_tokenAddress).balanceOf(msg.sender) < amountToLend) {
                 revert Protocol__InsufficientBalance();
             }
-            if (IERC20(_tokenAddress).allowance(msg.sender, address(this)) < amountToLend) {
+            if (
+                IERC20(_tokenAddress).allowance(msg.sender, address(this)) <
+                amountToLend
+            ) {
                 revert Protocol__InsufficientAllowance();
             }
         }
 
         // Get token's decimal value and calculate the loan's USD equivalent
         uint8 _decimalToken = LibGettersImpl._getTokenDecimal(_tokenAddress);
-        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, _tokenAddress, amountToLend, _decimalToken);
+        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(
+            _appStorage,
+            _tokenAddress,
+            amountToLend,
+            _decimalToken
+        );
 
         // Calculate the total repayment amount including interest
-        uint256 _totalRepayment =
-            Utils.calculateLoanInterest(_foundRequest.returnDate, _foundRequest.amount, _foundRequest.interest);
+        uint256 _totalRepayment = Utils.calculateLoanInterest(
+            _foundRequest.returnDate,
+            _foundRequest.amount,
+            _foundRequest.interest
+        );
         _foundRequest.totalRepayment = _totalRepayment;
 
         // Update total loan collected in USD for the borrower
-        _appStorage.addressToUser[_foundRequest.author].totalLoanCollected +=
-            LibGettersImpl._getUsdValue(_appStorage, _tokenAddress, _totalRepayment, _decimalToken);
+        _appStorage
+            .addressToUser[_foundRequest.author]
+            .totalLoanCollected += LibGettersImpl._getUsdValue(
+            _appStorage,
+            _tokenAddress,
+            _totalRepayment,
+            _decimalToken
+        );
 
         // Validate borrower's collateral health factor after loan
-        if (LibGettersImpl._healthFactor(_appStorage, _foundRequest.author, _loanUsdValue) < 1) {
+        if (
+            LibGettersImpl._healthFactor(
+                _appStorage,
+                _foundRequest.author,
+                _loanUsdValue
+            ) < 1
+        ) {
             revert Protocol__InsufficientCollateral();
         }
 
         // Lock collateral amounts in the specified tokens for the request
         for (uint256 i = 0; i < _foundRequest.collateralTokens.length; i++) {
-            _appStorage.s_addressToAvailableBalance[_foundRequest.author][_foundRequest.collateralTokens[i]] -=
-                _appStorage.s_idToCollateralTokenAmount[_requestId][_foundRequest.collateralTokens[i]];
+            _appStorage.s_addressToAvailableBalance[_foundRequest.author][
+                _foundRequest.collateralTokens[i]
+            ] -= _appStorage.s_idToCollateralTokenAmount[_requestId][
+                _foundRequest.collateralTokens[i]
+            ];
         }
 
         // Transfer loan amount to borrower based on token type
         if (_tokenAddress != Constants.NATIVE_TOKEN) {
-            IERC20(_tokenAddress).safeTransferFrom(msg.sender, _foundRequest.author, amountToLend);
+            IERC20(_tokenAddress).safeTransferFrom(
+                msg.sender,
+                _foundRequest.author,
+                amountToLend
+            );
         } else {
-            (bool sent,) = payable(_foundRequest.author).call{value: amountToLend}("");
+            (bool sent, ) = payable(_foundRequest.author).call{
+                value: amountToLend
+            }("");
 
             if (!sent) revert Protocol__TransferFailed();
         }
 
         // Emit an event indicating successful servicing of the request
-        emit RequestServiced(_requestId, msg.sender, _foundRequest.author, amountToLend, _chainSelector);
+        emit RequestServiced(
+            _requestId,
+            msg.sender,
+            _foundRequest.author,
+            amountToLend,
+            _chainSelector
+        );
     }
 
     /**
@@ -228,9 +300,11 @@ library LibProtocol {
      *
      * Emits a `withdrawnAdsToken` event indicating the author, listing ID, status, and amount withdrawn.
      */
-    function _closeListingAd(LibAppStorage.Layout storage _appStorage, uint96 _listingId, uint64 _chainSelector)
-        internal
-    {
+    function _closeListingAd(
+        LibAppStorage.Layout storage _appStorage,
+        uint96 _listingId,
+        uint64 _chainSelector
+    ) internal {
         // Retrieve the loan listing associated with the given listing ID
         LoanListing storage _newListing = _appStorage.loanListings[_listingId];
 
@@ -255,7 +329,7 @@ library LibProtocol {
         // Handle the transfer of funds based on whether the token is native or ERC20
         if (_newListing.tokenAddress == Constants.NATIVE_TOKEN) {
             // Transfer native tokens (ETH) to the author
-            (bool sent,) = payable(msg.sender).call{value: _amount}("");
+            (bool sent, ) = payable(msg.sender).call{value: _amount}("");
             if (!sent) revert Protocol__TransferFailed(); // Revert if the transfer fails
         } else {
             // Transfer ERC20 tokens to the author
@@ -263,7 +337,13 @@ library LibProtocol {
         }
 
         // Emit an event to notify that the listing has been closed and tokens have been withdrawn
-        emit withdrawnAdsToken(msg.sender, _listingId, uint8(_newListing.listingStatus), _amount, _chainSelector);
+        emit withdrawnAdsToken(
+            msg.sender,
+            _listingId,
+            uint8(_newListing.listingStatus),
+            _amount,
+            _chainSelector
+        );
     }
 
     /**
@@ -276,9 +356,11 @@ library LibProtocol {
      *
      * Emits a `RequestClosed` event indicating the request ID and the author of the request.
      */
-    function _closeRequest(LibAppStorage.Layout storage _appStorage, uint96 _requestId, uint64 _chainSelector)
-        internal
-    {
+    function _closeRequest(
+        LibAppStorage.Layout storage _appStorage,
+        uint96 _requestId,
+        uint64 _chainSelector
+    ) internal {
         // Retrieve the lending request associated with the given request ID
         Request storage _foundRequest = _appStorage.request[_requestId];
 
@@ -323,10 +405,8 @@ library LibProtocol {
         uint16 _interest,
         address _loanCurrency,
         address[] memory _whitelist,
-        uint64 _chainSelector
-    ) internal 
-    // payable
-    {
+        uint64 _chainSelector // payable
+    ) internal {
         // Validate that the amount is greater than zero and that a value has been sent if using native token
         Validator._valueMoreThanZero(_amount, _loanCurrency, msg.value);
         Validator._moreThanZero(_amount);
@@ -342,7 +422,10 @@ library LibProtocol {
                 revert Protocol__InsufficientBalance();
             }
 
-            if (IERC20(_loanCurrency).allowance(msg.sender, address(this)) < _amount) {
+            if (
+                IERC20(_loanCurrency).allowance(msg.sender, address(this)) <
+                _amount
+            ) {
                 revert Protocol__InsufficientAllowance();
             }
         }
@@ -354,12 +437,18 @@ library LibProtocol {
 
         // Transfer the specified amount from the user to the contract if using a token
         if (_loanCurrency != Constants.NATIVE_TOKEN) {
-            IERC20(_loanCurrency).safeTransferFrom(msg.sender, address(this), _amount);
+            IERC20(_loanCurrency).safeTransferFrom(
+                msg.sender,
+                address(this),
+                _amount
+            );
         }
 
         // Increment the listing ID to create a new loan listing
         _appStorage.listingId = _appStorage.listingId + 1;
-        LoanListing storage _newListing = _appStorage.loanListings[_appStorage.listingId];
+        LoanListing storage _newListing = _appStorage.loanListings[
+            _appStorage.listingId
+        ];
 
         // Populate the loan listing struct with the provided details
         _newListing.listingId = _appStorage.listingId;
@@ -374,7 +463,13 @@ library LibProtocol {
         _newListing.whitelist = _whitelist;
 
         // Emit an event to notify that a new loan listing has been created
-        emit LoanListingCreated(_appStorage.listingId, msg.sender, _loanCurrency, _amount, _chainSelector);
+        emit LoanListingCreated(
+            _appStorage.listingId,
+            msg.sender,
+            _loanCurrency,
+            _amount,
+            _chainSelector
+        );
     }
 
     /**
@@ -413,23 +508,41 @@ library LibProtocol {
         }
 
         // Validate that the requested amount is within the listing's constraints
-        if ((_amount < _listing.min_amount) || (_amount > _listing.max_amount)) {
+        if (
+            (_amount < _listing.min_amount) || (_amount > _listing.max_amount)
+        ) {
             revert Protocol__InvalidAmount();
         }
         if (_amount > _listing.amount) revert Protocol__InvalidAmount();
 
         // Fetch token decimal and calculate USD value of the loan amount
-        uint8 _decimalToken = LibGettersImpl._getTokenDecimal(_listing.tokenAddress);
-        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, _listing.tokenAddress, _amount, _decimalToken);
+        uint8 _decimalToken = LibGettersImpl._getTokenDecimal(
+            _listing.tokenAddress
+        );
+        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(
+            _appStorage,
+            _listing.tokenAddress,
+            _amount,
+            _decimalToken
+        );
 
         // Ensure borrower meets the health factor threshold for collateralization
-        if (LibGettersImpl._healthFactor(_appStorage, msg.sender, _loanUsdValue) < 1) {
+        if (
+            LibGettersImpl._healthFactor(
+                _appStorage,
+                msg.sender,
+                _loanUsdValue
+            ) < 1
+        ) {
             revert Protocol__InsufficientCollateral();
         }
 
         // Calculate max loanable amount based on collateral value
-        uint256 collateralValueInLoanCurrency = LibGettersImpl._getAccountCollateralValue(_appStorage, msg.sender);
-        uint256 maxLoanableAmount = Utils.maxLoanableAmount(collateralValueInLoanCurrency);
+        uint256 collateralValueInLoanCurrency = LibGettersImpl
+            ._getAccountCollateralValue(_appStorage, msg.sender);
+        uint256 maxLoanableAmount = Utils.maxLoanableAmount(
+            collateralValueInLoanCurrency
+        );
 
         // Update the listing's available amount, adjusting min/max amounts as necessary
         _listing.amount = _listing.amount - _amount;
@@ -440,56 +553,93 @@ library LibProtocol {
         if (_listing.amount == 0) _listing.listingStatus = ListingStatus.CLOSED;
 
         // Retrieve the borrower's collateral tokens for collateralization
-        address[] memory _collateralTokens = LibGettersImpl._getUserCollateralTokens(_appStorage, msg.sender);
+        address[] memory _collateralTokens = LibGettersImpl
+            ._getUserCollateralTokens(_appStorage, msg.sender);
 
         // Create a new loan request with a unique ID
         _appStorage.requestId = _appStorage.requestId + 1;
-        Request storage _newRequest = _appStorage.request[_appStorage.requestId];
+        Request storage _newRequest = _appStorage.request[
+            _appStorage.requestId
+        ];
         _newRequest.requestId = _appStorage.requestId;
         _newRequest.author = msg.sender;
         _newRequest.lender = _listing.author;
         _newRequest.amount = _amount;
         _newRequest.interest = _listing.interest;
         _newRequest.returnDate = _listing.returnDate;
-        _newRequest.totalRepayment = Utils.calculateLoanInterest(_listing.returnDate, _amount, _listing.interest);
+        _newRequest.totalRepayment = Utils.calculateLoanInterest(
+            _listing.returnDate,
+            _amount,
+            _listing.interest
+        );
         _newRequest.loanRequestAddr = _listing.tokenAddress;
         _newRequest.collateralTokens = _collateralTokens;
         _newRequest.status = Status.SERVICED;
 
         // Calculate collateral to lock for each token, proportional to its USD value
-        uint256 collateralToLock = Utils.calculateColateralToLock(_loanUsdValue, maxLoanableAmount);
+        uint256 collateralToLock = Utils.calculateColateralToLock(
+            _loanUsdValue,
+            maxLoanableAmount
+        );
         for (uint256 i = 0; i < _collateralTokens.length; i++) {
             address token = _collateralTokens[i];
             uint8 decimal = LibGettersImpl._getTokenDecimal(token);
-            uint256 userBalance = _appStorage.s_addressToCollateralDeposited[msg.sender][token];
+            uint256 userBalance = _appStorage.s_addressToCollateralDeposited[
+                msg.sender
+            ][token];
 
-            uint256 amountToLockUSD =
-                (LibGettersImpl._getUsdValue(_appStorage, token, userBalance, decimal) * collateralToLock) / 100;
+            uint256 amountToLockUSD = (LibGettersImpl._getUsdValue(
+                _appStorage,
+                token,
+                userBalance,
+                decimal
+            ) * collateralToLock) / 100;
 
-            uint256 amountToLock = (
-                (((amountToLockUSD) * 10) / LibGettersImpl._getUsdValue(_appStorage, token, 10, 0))
-                    * (10 ** _decimalToken)
-            ) / (Constants.PRECISION);
+            uint256 amountToLock = ((((amountToLockUSD) * 10) /
+                LibGettersImpl._getUsdValue(_appStorage, token, 10, 0)) *
+                (10 ** _decimalToken)) / (Constants.PRECISION);
 
-            _appStorage.s_idToCollateralTokenAmount[_appStorage.requestId][token] = amountToLock;
-            _appStorage.s_addressToAvailableBalance[msg.sender][token] -= amountToLock;
+            _appStorage.s_idToCollateralTokenAmount[_appStorage.requestId][
+                token
+            ] = amountToLock;
+            _appStorage.s_addressToAvailableBalance[msg.sender][
+                token
+            ] -= amountToLock;
         }
 
         // Update borrower's total loan collected in USD
-        _appStorage.addressToUser[msg.sender].totalLoanCollected +=
-            LibGettersImpl._getUsdValue(_appStorage, _listing.tokenAddress, _newRequest.totalRepayment, _decimalToken);
+        _appStorage
+            .addressToUser[msg.sender]
+            .totalLoanCollected += LibGettersImpl._getUsdValue(
+            _appStorage,
+            _listing.tokenAddress,
+            _newRequest.totalRepayment,
+            _decimalToken
+        );
 
         // Transfer the loan amount to the borrower
         if (_listing.tokenAddress == Constants.NATIVE_TOKEN) {
-            (bool sent,) = payable(msg.sender).call{value: _amount}("");
+            (bool sent, ) = payable(msg.sender).call{value: _amount}("");
             if (!sent) revert Protocol__TransferFailed();
         } else {
             IERC20(_listing.tokenAddress).safeTransfer(msg.sender, _amount);
         }
 
         // Emit events to notify the loan request creation and servicing
-        emit RequestCreated(msg.sender, _appStorage.requestId, _amount, _listing.interest, _chainSelector);
-        emit RequestServiced(_newRequest.requestId, _newRequest.lender, _newRequest.author, _amount, _chainSelector);
+        emit RequestCreated(
+            msg.sender,
+            _appStorage.requestId,
+            _amount,
+            _listing.interest,
+            _chainSelector
+        );
+        emit RequestServiced(
+            _newRequest.requestId,
+            _newRequest.lender,
+            _newRequest.author,
+            _amount,
+            _chainSelector
+        );
     }
 
     /**
@@ -510,10 +660,8 @@ library LibProtocol {
         LibAppStorage.Layout storage _appStorage,
         uint96 _requestId,
         uint256 _amount,
-        uint64 _chainSelector
-    ) internal 
-    // payable
-    {
+        uint64 _chainSelector // payable
+    ) internal {
         Validator._moreThanZero(_amount);
 
         Request storage _request = _appStorage.request[_requestId];
@@ -547,29 +695,51 @@ library LibProtocol {
 
             for (uint256 i = 0; i < _request.collateralTokens.length; i++) {
                 address collateralToken = _request.collateralTokens[i];
-                _appStorage.s_addressToAvailableBalance[_request.author][collateralToken] +=
-                    _appStorage.s_idToCollateralTokenAmount[_requestId][collateralToken];
+                _appStorage.s_addressToAvailableBalance[_request.author][
+                    collateralToken
+                ] += _appStorage.s_idToCollateralTokenAmount[_requestId][
+                    collateralToken
+                ];
             }
         } else {
             // Reduce the outstanding repayment amount for partial payments
             _request.totalRepayment -= _amount;
         }
 
-        (, uint256 _amountAfterFees) = _settleFees(_appStorage, _request.loanRequestAddr, _amount);
+        (, uint256 _amountAfterFees) = _settleFees(
+            _appStorage,
+            _request.loanRequestAddr,
+            _amount
+        );
 
         // Update borrower’s loan collected metrics in USD
-        uint8 decimal = LibGettersImpl._getTokenDecimal(_request.loanRequestAddr);
-        uint256 _loanUsdValue =
-            LibGettersImpl._getUsdValue(_appStorage, _request.loanRequestAddr, _amountAfterFees, decimal);
-        uint256 loanCollected = LibGettersImpl._getLoanCollectedInUsd(_appStorage, msg.sender);
+        uint8 decimal = LibGettersImpl._getTokenDecimal(
+            _request.loanRequestAddr
+        );
+        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(
+            _appStorage,
+            _request.loanRequestAddr,
+            _amountAfterFees,
+            decimal
+        );
+        uint256 loanCollected = LibGettersImpl._getLoanCollectedInUsd(
+            _appStorage,
+            msg.sender
+        );
 
         // Deposit the repayment amount to the lender's available balance
-        _appStorage.s_addressToCollateralDeposited[_request.lender][_request.loanRequestAddr] += _amountAfterFees;
-        _appStorage.s_addressToAvailableBalance[_request.lender][_request.loanRequestAddr] += _amountAfterFees;
+        _appStorage.s_addressToCollateralDeposited[_request.lender][
+            _request.loanRequestAddr
+        ] += _amountAfterFees;
+        _appStorage.s_addressToAvailableBalance[_request.lender][
+            _request.loanRequestAddr
+        ] += _amountAfterFees;
 
         // Adjust the borrower's total loan collected
         if (loanCollected > _loanUsdValue) {
-            _appStorage.addressToUser[msg.sender].totalLoanCollected = loanCollected - _loanUsdValue;
+            _appStorage.addressToUser[msg.sender].totalLoanCollected =
+                loanCollected -
+                _loanUsdValue;
         } else {
             _appStorage.addressToUser[msg.sender].totalLoanCollected = 0;
         }
@@ -578,15 +748,18 @@ library LibProtocol {
         emit LoanRepayment(msg.sender, _requestId, _amount, _chainSelector);
     }
 
-    function _settleFees(LibAppStorage.Layout storage _appStorage, address _token, uint256 _amount)
-        internal
-        returns (uint256, uint256)
-    {
+    function _settleFees(
+        LibAppStorage.Layout storage _appStorage,
+        address _token,
+        uint256 _amount
+    ) internal returns (uint256, uint256) {
         uint16 _feeRate = _appStorage.feeRateBps;
 
         uint256 _fee = Utils.calculatePercentage(_amount, _feeRate);
 
-        _appStorage.s_feesAccrued[_token] = _appStorage.s_feesAccrued[_token] + _fee;
+        _appStorage.s_feesAccrued[_token] =
+            _appStorage.s_feesAccrued[_token] +
+            _fee;
 
         return (_amount, (_amount - _fee));
     }

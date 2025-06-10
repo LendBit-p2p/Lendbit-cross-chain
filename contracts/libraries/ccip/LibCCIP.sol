@@ -79,13 +79,25 @@ library LibCCIP {
         if (_messageType == CCIPMessageType.CREATE_REQUEST) {
             //decode the data
             (
-                address token,
-                uint256 amount,
-                uint256 interestRate,
-                uint256 duration
-            ) = abi.decode(_messageData, (address, uint256, uint256, uint256));
+                uint256 _amount,
+                uint16 _interestRate,
+                uint256 _duration,
+                address _token,
+                address _user
+            ) = abi.decode(
+                    _messageData,
+                    (address, uint256, uint256, uint256, address)
+                );
 
             // create the request
+            _appStorage._createLendingRequest(
+                _amount,
+                _interestRate,
+                _duration,
+                _token,
+                _sourceChainSelector,
+                _user
+            );
         }
         if (_messageType == CCIPMessageType.SERVICE_REQUEST) {
             //decode the data
