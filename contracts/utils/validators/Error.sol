@@ -96,3 +96,12 @@ error InvalidReceiver();
 error ExchangeRateDecrease();
 error VaultNotExists();
 error ProtocolPool__VaultNotDeployed();
+
+
+
+
+error Protocol__AddressZero();
+error ProtocolPool__NoDebt();
+error Protocol__LiquidationTooSmall();
+error Protocol__NoCollateralToSeize();
+error ProtocolPool__PositionStillHealthy();

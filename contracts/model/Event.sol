@@ -214,7 +214,14 @@ event CCIPMessageExecuted(
 
 
 event VaultDeployed(address indexed token, address indexed vault, string name, string symbol);
-
+event LpLiquidated(
+address indexed _debtorAddress,
+address indexed _liquidatorAddress,
+address indexed _tokenAddress,
+uint256 liquidationAmount,
+uint256 totalCollateralSeizedUsd,
+uint64 _chainSelector
+);
 // Events
 event VaultDeposited(address indexed asset, address indexed depositor, uint256 amount, uint256 shares);
 
