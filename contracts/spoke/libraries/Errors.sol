@@ -13,3 +13,4 @@ error Spoke__TransferFailed();
 error Spoke__InvalidAmount();
 error Spoke__InvalidInterest();
 error Spoke__DateMustBeInFuture();
+error Spoke__InvalidRequest();

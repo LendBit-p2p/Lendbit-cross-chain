@@ -101,10 +101,13 @@ library LibCCIP {
         }
         if (_messageType == CCIPMessageType.SERVICE_REQUEST) {
             //decode the data
-            (address _token, uint256 _amount, uint96 _requestId) = abi.decode(
+            (uint96 _requestId, bool _isNative, address _user) = abi.decode(
                 _messageData,
-                (address, uint256, uint96)
+                (uint96, bool, address)
             );
+
+            // service the request
+            _appStorage._serviceLendingRequest(_requestId, _isNative, _user);
         }
         if (_messageType == CCIPMessageType.BORROW_FROM_LISTING) {
             //decode the data
