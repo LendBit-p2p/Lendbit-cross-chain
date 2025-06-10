@@ -3,8 +3,10 @@ pragma solidity ^0.8.20;
 
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.sol";
-import {IERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from
+    "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from
+    "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IRouterClient} from "@chainlink/contract-ccip/contracts/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink/contract-ccip/contracts/libraries/Client.sol";
 import {CCIPReceiver} from "@chainlink/contract-ccip/contracts/applications/CCIPReceiver.sol";
@@ -41,13 +43,9 @@ contract SpokeContract is CCIPReceiver {
         LIQUIDATE
     }
 
-    constructor(
-        address _hub,
-        uint64 _chainSelector,
-        address _link,
-        address _router,
-        address _weth
-    ) CCIPReceiver(_router) {
+    constructor(address _hub, uint64 _chainSelector, address _link, address _router, address _weth)
+        CCIPReceiver(_router)
+    {
         i_hub = _hub;
         i_chainSelector = _chainSelector;
         i_link = LinkTokenInterface(_link);
@@ -65,10 +63,7 @@ contract SpokeContract is CCIPReceiver {
      * @param amount The amount of tokens to deposit
      * @return shares The amount of shares received
      */
-    function deposit(
-        address token,
-        uint256 amount
-    ) external payable returns (uint256 shares) {
+    function deposit(address token, uint256 amount) external payable returns (uint256 shares) {
         //TODO: // Currently Working on the Todo
         return 0;
     }
@@ -79,10 +74,7 @@ contract SpokeContract is CCIPReceiver {
      * @param amount The amount of tokens to withdraw
      * @return amountWithdrawn The amount of tokens withdrawn
      */
-    function withdraw(
-        address token,
-        uint256 amount
-    ) external returns (uint256 amountWithdrawn) {
+    function withdraw(address token, uint256 amount) external returns (uint256 amountWithdrawn) {
         //TODO: // Currently Working on the Todo
         return 0;
     }
@@ -102,10 +94,7 @@ contract SpokeContract is CCIPReceiver {
      * @param amount The amount of tokens to repay
      * @return amountRepaid The amount of tokens repaid
      */
-    function repay(
-        address token,
-        uint256 amount
-    ) external payable returns (uint256 amountRepaid) {
+    function repay(address token, uint256 amount) external payable returns (uint256 amountRepaid) {
         //TODO: // Currently Working on the Todo
         return 0;
     }
@@ -118,68 +107,46 @@ contract SpokeContract is CCIPReceiver {
      * @param _returnDate The date the loan is due
      * @param _loanCurrency The currency of the loan
      */
-    function createLendingRequest(
-        uint256 _amount,
-        uint16 _interest,
-        uint256 _returnDate,
-        address _loanCurrency
-    ) external payable returns (bytes32) {
-        if (!s_isTokenSupported[_loanCurrency])
+    function createLendingRequest(uint256 _amount, uint16 _interest, uint256 _returnDate, address _loanCurrency)
+        external
+        payable
+        returns (bytes32)
+    {
+        if (!s_isTokenSupported[_loanCurrency]) {
             revert Spoke__TokenNotSupported();
+        }
 
         if (_amount == 0) revert Spoke__InvalidAmount();
         if (_interest == 0) revert Spoke__InvalidInterest();
 
-        if (_returnDate < block.timestamp + 1 days)
+        if (_returnDate < block.timestamp + 1 days) {
             revert Spoke__DateMustBeInFuture();
+        }
 
         bytes memory messageData = abi.encode(
             CCIPMessageType.CREATE_REQUEST,
-            abi.encode(
-                _amount,
-                _interest,
-                _returnDate,
-                s_tokenToHubTokens[_loanCurrency],
-                msg.sender
-            )
+            abi.encode(_amount, _interest, _returnDate, s_tokenToHubTokens[_loanCurrency], msg.sender)
         );
 
-        Client.EVMTokenAmount[]
-            memory tokensToSendDetails = new Client.EVMTokenAmount[](0);
+        Client.EVMTokenAmount[] memory tokensToSendDetails = new Client.EVMTokenAmount[](0);
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
             receiver: abi.encode(i_hub),
             data: messageData,
             tokenAmounts: tokensToSendDetails,
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({
-                    gasLimit: 600_000,
-                    allowOutOfOrderExecution: true
-                })
-            ),
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 600_000, allowOutOfOrderExecution: true})),
             feeToken: address(0)
         });
 
-        uint256 fee = IRouterClient(i_ccipRouter).getFee(
-            i_chainSelector,
-            message
-        );
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(i_chainSelector, message);
 
         if (msg.value < fee) {
             revert Spoke__InsufficientFee();
         }
 
-        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(
-            i_chainSelector,
-            message
-        );
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(i_chainSelector, message);
 
-        emit CCIPMessageSent(
-            messageId,
-            i_chainSelector,
-            msg.sender,
-            tokensToSendDetails
-        );
+        emit CCIPMessageSent(messageId, i_chainSelector, msg.sender, tokensToSendDetails);
 
         return messageId;
     }
@@ -189,29 +156,26 @@ contract SpokeContract is CCIPReceiver {
      * @param _requestId The ID of the request
      * @param _tokenAddress The address of the token to service
      */
-    function serviceRequest(
-        uint96 _requestId,
-        address _tokenAddress,
-        uint256 _amount
-    ) external payable returns (bytes32) {
-        if (!s_isTokenSupported[_tokenAddress])
+    function serviceRequest(uint96 _requestId, address _tokenAddress, uint256 _amount)
+        external
+        payable
+        returns (bytes32)
+    {
+        if (!s_isTokenSupported[_tokenAddress]) {
             revert Spoke__TokenNotSupported();
+        }
 
         Validitions.validateTokenParams(_tokenAddress, _amount);
 
         if (_requestId == 0) revert Spoke__InvalidRequest();
 
         bytes memory messageData = abi.encode(
-            CCIPMessageType.SERVICE_REQUEST,
-            abi.encode(_requestId, _tokenAddress == NATIVE_TOKEN, msg.sender)
+            CCIPMessageType.SERVICE_REQUEST, abi.encode(_requestId, _tokenAddress == NATIVE_TOKEN, msg.sender)
         );
 
-        Client.EVMTokenAmount[]
-            memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
+        Client.EVMTokenAmount[] memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
         tokensToSendDetails[0] = Client.EVMTokenAmount({
-            token: _tokenAddress == NATIVE_TOKEN
-                ? address(i_weth)
-                : _tokenAddress,
+            token: _tokenAddress == NATIVE_TOKEN ? address(i_weth) : _tokenAddress,
             amount: _amount
         });
 
@@ -219,19 +183,11 @@ contract SpokeContract is CCIPReceiver {
             receiver: abi.encode(i_hub),
             data: messageData,
             tokenAmounts: tokensToSendDetails,
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({
-                    gasLimit: 500_000,
-                    allowOutOfOrderExecution: true
-                })
-            ),
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 500_000, allowOutOfOrderExecution: true})),
             feeToken: address(0)
         });
 
-        uint256 fee = IRouterClient(i_ccipRouter).getFee(
-            i_chainSelector,
-            message
-        );
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(i_chainSelector, message);
 
         if (_tokenAddress == NATIVE_TOKEN && msg.value < (fee + _amount)) {
             revert Spoke__InsufficientNativeCollateral();
@@ -245,25 +201,13 @@ contract SpokeContract is CCIPReceiver {
             i_weth.deposit{value: _amount}();
             IERC20(address(i_weth)).approve(address(i_ccipRouter), _amount);
         } else {
-            IERC20(_tokenAddress).safeTransferFrom(
-                msg.sender,
-                address(this),
-                _amount
-            );
+            IERC20(_tokenAddress).safeTransferFrom(msg.sender, address(this), _amount);
             IERC20(_tokenAddress).approve(address(i_ccipRouter), _amount);
         }
 
-        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(
-            i_chainSelector,
-            message
-        );
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(i_chainSelector, message);
 
-        emit CCIPMessageSent(
-            messageId,
-            i_chainSelector,
-            msg.sender,
-            tokensToSendDetails
-        );
+        emit CCIPMessageSent(messageId, i_chainSelector, msg.sender, tokensToSendDetails);
 
         return messageId;
     }
@@ -302,8 +246,57 @@ contract SpokeContract is CCIPReceiver {
         uint16 _interest,
         address _loanCurrency,
         address[] memory _whitelist
-    ) external payable {
-        //TODO: // Currently Working on the Todo
+    ) external payable returns (bytes32) {
+        if (!s_isTokenSupported[_loanCurrency]) {
+            revert Spoke__TokenNotSupported();
+        }
+
+        if (_loanCurrency != NATIVE_TOKEN && IERC20(_loanCurrency).balanceOf(msg.sender) < _amount) {
+            revert Spoke__InsufficientCollateral();
+        }
+
+        Client.EVMTokenAmount[] memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
+        tokensToSendDetails[0] = Client.EVMTokenAmount({
+            token: _loanCurrency == NATIVE_TOKEN ? address(i_weth) : _loanCurrency,
+            amount: _amount
+        });
+
+        bytes memory messageData = abi.encode(
+            CCIPMessageType.CREATE_LISTING,
+            abi.encode(msg.sender, _loanCurrency, _amount, _min_amount, _max_amount, _interest, _returnDate, _whitelist)
+        );
+
+        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(i_hub),
+            data: messageData,
+            tokenAmounts: tokensToSendDetails,
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 300_000, allowOutOfOrderExecution: true})),
+            feeToken: address(0)
+        });
+
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(i_chainSelector, message);
+
+        if (_loanCurrency == NATIVE_TOKEN && msg.value < (fee + _amount)) {
+            revert Spoke__InsufficientNativeCollateral();
+        } else {
+            if (msg.value < fee) {
+                revert Spoke__InsufficientFee();
+            }
+        }
+
+        if (_loanCurrency == NATIVE_TOKEN) {
+            i_weth.deposit{value: _amount}();
+            IERC20(address(i_weth)).approve(address(i_ccipRouter), _amount);
+        } else {
+            IERC20(_loanCurrency).safeTransferFrom(msg.sender, address(this), _amount);
+            IERC20(_loanCurrency).approve(address(i_ccipRouter), _amount);
+        }
+
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(i_chainSelector, message);
+
+        emit CCIPMessageSent(messageId, i_chainSelector, msg.sender, tokensToSendDetails);
+
+        return messageId;
     }
 
     /**
@@ -330,55 +323,38 @@ contract SpokeContract is CCIPReceiver {
      * @param _tokenCollateralAddress The address of the collateral token
      * @param _amountOfCollateral The amount of collateral to deposit
      */
-    function depositCollateral(
-        address _tokenCollateralAddress,
-        uint256 _amountOfCollateral
-    ) external payable returns (bytes32) {
+    function depositCollateral(address _tokenCollateralAddress, uint256 _amountOfCollateral)
+        external
+        payable
+        returns (bytes32)
+    {
         if (!s_isTokenSupported[_tokenCollateralAddress]) {
             revert Spoke__TokenNotSupported();
         }
 
-        Validitions.validateTokenParams(
-            _tokenCollateralAddress,
-            _amountOfCollateral
-        );
+        Validitions.validateTokenParams(_tokenCollateralAddress, _amountOfCollateral);
 
-        Client.EVMTokenAmount[]
-            memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
+        Client.EVMTokenAmount[] memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
         tokensToSendDetails[0] = Client.EVMTokenAmount({
-            token: _tokenCollateralAddress == NATIVE_TOKEN
-                ? address(i_weth)
-                : _tokenCollateralAddress,
+            token: _tokenCollateralAddress == NATIVE_TOKEN ? address(i_weth) : _tokenCollateralAddress,
             amount: _amountOfCollateral
         });
 
         bytes memory messageData = abi.encode(
-            CCIPMessageType.DEPOSIT_COLLATERAL,
-            abi.encode(_tokenCollateralAddress == NATIVE_TOKEN, msg.sender)
+            CCIPMessageType.DEPOSIT_COLLATERAL, abi.encode(_tokenCollateralAddress == NATIVE_TOKEN, msg.sender)
         );
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
             receiver: abi.encode(i_hub),
             data: messageData,
             tokenAmounts: tokensToSendDetails,
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({
-                    gasLimit: 200_000,
-                    allowOutOfOrderExecution: true
-                })
-            ),
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 200_000, allowOutOfOrderExecution: true})),
             feeToken: address(0)
         });
 
-        uint256 fee = IRouterClient(i_ccipRouter).getFee(
-            i_chainSelector,
-            message
-        );
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(i_chainSelector, message);
 
-        if (
-            _tokenCollateralAddress == NATIVE_TOKEN &&
-            msg.value < (fee + _amountOfCollateral)
-        ) {
+        if (_tokenCollateralAddress == NATIVE_TOKEN && msg.value < (fee + _amountOfCollateral)) {
             revert Spoke__InsufficientNativeCollateral();
         } else {
             if (msg.value < fee) {
@@ -388,33 +364,15 @@ contract SpokeContract is CCIPReceiver {
 
         if (_tokenCollateralAddress == NATIVE_TOKEN) {
             i_weth.deposit{value: _amountOfCollateral}();
-            IERC20(address(i_weth)).approve(
-                address(i_ccipRouter),
-                _amountOfCollateral
-            );
+            IERC20(address(i_weth)).approve(address(i_ccipRouter), _amountOfCollateral);
         } else {
-            IERC20(_tokenCollateralAddress).safeTransferFrom(
-                msg.sender,
-                address(this),
-                _amountOfCollateral
-            );
-            IERC20(_tokenCollateralAddress).approve(
-                address(i_ccipRouter),
-                _amountOfCollateral
-            );
+            IERC20(_tokenCollateralAddress).safeTransferFrom(msg.sender, address(this), _amountOfCollateral);
+            IERC20(_tokenCollateralAddress).approve(address(i_ccipRouter), _amountOfCollateral);
         }
 
-        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(
-            i_chainSelector,
-            message
-        );
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(i_chainSelector, message);
 
-        emit CCIPMessageSent(
-            messageId,
-            i_chainSelector,
-            msg.sender,
-            tokensToSendDetails
-        );
+        emit CCIPMessageSent(messageId, i_chainSelector, msg.sender, tokensToSendDetails);
 
         return messageId;
     }
@@ -424,58 +382,35 @@ contract SpokeContract is CCIPReceiver {
      * @param _tokenCollateralAddress The address of the collateral token
      * @param _amountOfCollateral The amount of collateral to withdraw
      */
-    function withdrawCollateral(
-        address _tokenCollateralAddress,
-        uint256 _amountOfCollateral
-    ) external payable {
+    function withdrawCollateral(address _tokenCollateralAddress, uint256 _amountOfCollateral) external payable {
         if (!s_isTokenSupported[_tokenCollateralAddress]) {
             revert Spoke__TokenNotSupported();
         }
 
-        Client.EVMTokenAmount[]
-            memory tokensToSendDetails = new Client.EVMTokenAmount[](0);
+        Client.EVMTokenAmount[] memory tokensToSendDetails = new Client.EVMTokenAmount[](0);
 
         bytes memory messageData = abi.encode(
             CCIPMessageType.WITHDRAW_COLLATERAL,
-            abi.encode(
-                s_tokenToHubTokens[_tokenCollateralAddress],
-                _amountOfCollateral,
-                msg.sender
-            )
+            abi.encode(s_tokenToHubTokens[_tokenCollateralAddress], _amountOfCollateral, msg.sender)
         );
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
             receiver: abi.encode(i_hub),
             data: messageData,
             tokenAmounts: tokensToSendDetails,
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({
-                    gasLimit: 300_000,
-                    allowOutOfOrderExecution: true
-                })
-            ),
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 300_000, allowOutOfOrderExecution: true})),
             feeToken: address(0)
         });
 
-        uint256 fee = IRouterClient(i_ccipRouter).getFee(
-            i_chainSelector,
-            message
-        );
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(i_chainSelector, message);
 
         if (msg.value < fee) {
             revert Spoke__InsufficientFee();
         }
 
-        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
-            value: msg.value
-        }(i_chainSelector, message);
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: msg.value}(i_chainSelector, message);
 
-        emit CCIPMessageSent(
-            messageId,
-            i_chainSelector,
-            msg.sender,
-            tokensToSendDetails
-        );
+        emit CCIPMessageSent(messageId, i_chainSelector, msg.sender, tokensToSendDetails);
     }
 
     function addToken(address _token, address _hubToken) external {
@@ -486,62 +421,40 @@ contract SpokeContract is CCIPReceiver {
     //////////////////
     ///// GETTERS ////
     //////////////////
-    function getFees(
-        Client.EVM2AnyMessage memory message
-    ) external view returns (uint256) {
+    function getFees(Client.EVM2AnyMessage memory message) external view returns (uint256) {
         return IRouterClient(i_ccipRouter).getFee(i_chainSelector, message);
     }
 
-    function getHubTokenAddress(
-        address _token
-    ) external view returns (address) {
+    function getHubTokenAddress(address _token) external view returns (address) {
         return s_tokenToHubTokens[_token];
     }
 
     //////////////////
     /// INTERNALS ///
     ////////////////
-    function _ccipReceive(
-        Client.Any2EVMMessage memory message
-    ) internal override {
+    function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
         address _sender = abi.decode(message.sender, (address));
-        if (
-            _sender != i_hub || message.sourceChainSelector != i_chainSelector
-        ) {
+        if (_sender != i_hub || message.sourceChainSelector != i_chainSelector) {
             revert Spoke__NotHub();
         }
 
-        (bool _isNative, , address _receiver) = abi.decode(
-            message.data,
-            (bool, Client.EVMTokenAmount[], address)
-        );
+        (bool _isNative,, address _receiver) = abi.decode(message.data, (bool, Client.EVMTokenAmount[], address));
 
-        Client.EVMTokenAmount[] memory _destTokenAmounts = message
-            .destTokenAmounts;
+        Client.EVMTokenAmount[] memory _destTokenAmounts = message.destTokenAmounts;
 
         if (_isNative) {
             i_weth.withdraw(_destTokenAmounts[0].amount);
-            (bool success, ) = _receiver.call{
-                value: _destTokenAmounts[0].amount
-            }("");
+            (bool success,) = _receiver.call{value: _destTokenAmounts[0].amount}("");
 
             if (!success) {
                 revert Spoke__TransferFailed();
             }
         } else {
-            IERC20(_destTokenAmounts[0].token).safeTransfer(
-                _receiver,
-                _destTokenAmounts[0].amount
-            );
+            IERC20(_destTokenAmounts[0].token).safeTransfer(_receiver, _destTokenAmounts[0].amount);
         }
 
         s_isMessageExecuted[message.messageId] = true;
 
-        emit CCIPMessageExecuted(
-            message.messageId,
-            i_chainSelector,
-            _receiver,
-            _destTokenAmounts
-        );
+        emit CCIPMessageExecuted(message.messageId, i_chainSelector, _receiver, _destTokenAmounts);
     }
 }
