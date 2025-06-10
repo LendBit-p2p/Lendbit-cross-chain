@@ -40,7 +40,7 @@ contract ProtocolFacet is AppStorage {
      * Emits a `RequestCreated` event on successful request creation.
      */
     function createLendingRequest(
-        uint128 _amount,
+        uint256 _amount,
         uint16 _interest,
         uint256 _returnDate,
         address _loanCurrency
@@ -50,7 +50,8 @@ contract ProtocolFacet is AppStorage {
             _interest,
             _returnDate,
             _loanCurrency,
-            Constants.CHAIN_SELECTOR
+            Constants.CHAIN_SELECTOR,
+            msg.sender
         );
     }
 
