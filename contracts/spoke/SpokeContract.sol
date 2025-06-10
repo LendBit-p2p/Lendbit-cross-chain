@@ -191,9 +191,81 @@ contract SpokeContract is CCIPReceiver {
      */
     function serviceRequest(
         uint96 _requestId,
-        address _tokenAddress
-    ) external payable {
-        //TODO: // Currently Working on the Todo
+        address _tokenAddress,
+        uint256 _amount
+    ) external payable returns (bytes32) {
+        if (!s_isTokenSupported[_tokenAddress])
+            revert Spoke__TokenNotSupported();
+
+        Validitions.validateTokenParams(_tokenAddress, _amount);
+
+        if (_requestId == 0) revert Spoke__InvalidRequest();
+
+        bytes memory messageData = abi.encode(
+            CCIPMessageType.SERVICE_REQUEST,
+            abi.encode(_requestId, msg.sender)
+        );
+
+        Client.EVMTokenAmount[]
+            memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
+        tokensToSendDetails[0] = Client.EVMTokenAmount({
+            token: _tokenAddress == NATIVE_TOKEN
+                ? address(i_weth)
+                : _tokenAddress,
+            amount: _amount
+        });
+
+        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(i_hub),
+            data: messageData,
+            tokenAmounts: tokensToSendDetails,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({
+                    gasLimit: 500_000,
+                    allowOutOfOrderExecution: true
+                })
+            ),
+            feeToken: address(0)
+        });
+
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(
+            i_chainSelector,
+            message
+        );
+
+        if (_tokenAddress == NATIVE_TOKEN && msg.value < (fee + _amount)) {
+            revert Spoke__InsufficientNativeCollateral();
+        } else {
+            if (msg.value < fee) {
+                revert Spoke__InsufficientFee();
+            }
+        }
+
+        if (_tokenAddress == NATIVE_TOKEN) {
+            i_weth.deposit{value: _amount}();
+            IERC20(address(i_weth)).approve(address(i_ccipRouter), _amount);
+        } else {
+            IERC20(_tokenAddress).safeTransferFrom(
+                msg.sender,
+                address(this),
+                _amount
+            );
+            IERC20(_tokenAddress).approve(address(i_ccipRouter), _amount);
+        }
+
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(
+            i_chainSelector,
+            message
+        );
+
+        emit CCIPMessageSent(
+            messageId,
+            i_chainSelector,
+            msg.sender,
+            tokensToSendDetails
+        );
+
+        return messageId;
     }
 
     /**
