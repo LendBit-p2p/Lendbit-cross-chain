@@ -86,3 +86,12 @@ error ProtocolPool__InsufficientShares();
     error Protocol__InvalidCompoundingPeriods();
     error Protocol__ZeroLiquidity();
     error Protocol__InvalidBorrows();
+
+    //vault errors
+error UnauthorizedVault();
+error InsufficientLiquidity();
+error InsufficientShares();
+error ZeroAmount();
+error InvalidReceiver();
+error ExchangeRateDecrease();
+error VaultNotExists();
