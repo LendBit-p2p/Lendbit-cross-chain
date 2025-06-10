@@ -95,3 +95,4 @@ error ZeroAmount();
 error InvalidReceiver();
 error ExchangeRateDecrease();
 error VaultNotExists();
+error ProtocolPool__VaultNotDeployed();

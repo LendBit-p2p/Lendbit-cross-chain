@@ -33,6 +33,12 @@ struct TokenData {
     uint256 borrowIndex;
     uint256 totalReserves;
 }
+struct VaultConfig {
+    uint256 ltvBps; // Loan-to-Value (8500 = 85%)
+    uint256 liquidationThresholdBps;
+    uint256 totalDeposits;
+    uint256 totalBorrowed;
+}
 
 /**
  * @dev Struct to store information about a loan request.

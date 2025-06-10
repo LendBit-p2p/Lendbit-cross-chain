@@ -8,6 +8,12 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../model/Protocol.sol";
 import "../utils/validators/Error.sol";
 
+import {LibInterestRateModel} from "./LibInterestRateModel.sol";
+import {LibInterestAccure} from "./LibInterestAccure.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+
+
 library LibGettersImpl {
     /**
      * @dev Converts a specified token amount to its USD-equivalent value based on

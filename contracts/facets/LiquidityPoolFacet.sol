@@ -12,7 +12,7 @@ import {LibRateCalculations} from "../libraries/LibRateCalculation.sol";
 import {Utils} from "../utils/functions/Utils.sol";
 import {ProtocolPool, TokenData, UserBorrowData} from "../model/Protocol.sol";
 import {LibGettersImpl} from "../libraries/LibGetters.sol";
-import {LibVaultNotifications} from "../libraries/LibVaultNotification.sol";
+import {LibVaultNotifications} from "../libraries/LibVaultNotifications.sol";
 
 // import {VTokenVault} from "../vaults/VTokenVault.sol";
 
