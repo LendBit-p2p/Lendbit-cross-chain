@@ -139,7 +139,8 @@ contract SpokeContract is CCIPReceiver {
                 _amount,
                 _interest,
                 _returnDate,
-                s_tokenToHubTokens[_loanCurrency]
+                s_tokenToHubTokens[_loanCurrency],
+                msg.sender
             )
         );
 
