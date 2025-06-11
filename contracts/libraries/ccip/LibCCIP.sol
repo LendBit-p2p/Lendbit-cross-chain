@@ -10,11 +10,13 @@ import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.s
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Constants} from "../../utils/constants/Constant.sol";
 import {LibxShared} from "./LibxShared.sol";
+import {LibxLiquidityPool} from "./LibxLiquidityPool.sol";
 import {LibxProtocol} from "./LibxProtocol.sol";
 
 library LibCCIP {
     using LibxShared for LibAppStorage.Layout;
     using LibProtocol for LibAppStorage.Layout;
+    using LibxLiquidityPool for LibAppStorage.Layout;
     using LibxProtocol for LibAppStorage.Layout;
 
     function _resolveCCIPMessage(
@@ -28,21 +30,44 @@ library LibCCIP {
         // LP
         if (_messageType == CCIPMessageType.DEPOSIT) {
             //decode the data
-            (address _token, uint256 _amount) = abi.decode(
+            (bool isNative, uint256 _amount, address _user) = abi.decode(
                 _messageData,
-                (address, uint256)
+                (bool, uint256, address)
             );
 
+            if (isNative) {
+                //unwrap wrapped version of the native token
+                IWERC20(_destTokenAmounts[0].token).withdraw(
+                    _destTokenAmounts[0].amount
+                );
+
+                _appStorage._deposit(
+                    Constants.NATIVE_TOKEN,
+                    _destTokenAmounts[0].amount,
+                    _user,
+                    _sourceChainSelector
+                );
+            } else {
+                _appStorage._deposit(
+                    _destTokenAmounts[0].token,
+                    _destTokenAmounts[0].amount,
+                    _user,
+                    _sourceChainSelector
+                );
+            }
             // deposit the token to the liquidity pool
         }
         if (_messageType == CCIPMessageType.WITHDRAW) {
             //decode the data
-            (address _token, uint256 _amount) = abi.decode(
+            (address _token, uint256 _amount, address _user) = abi.decode(
                 _messageData,
-                (address, uint256)
+                (address, uint256, address)
             );
 
+
             // withdraw the token from the liquidity pool
+            _appStorage._withdraw(_token, _amount, _user, _sourceChainSelector);
+
         }
         if (_messageType == CCIPMessageType.BORROW) {
             //decode the data

@@ -14,6 +14,8 @@ library Constants {
     uint64 constant CHAIN_SELECTOR = 10344971235874465080;
     uint256 constant MAX_LIQUIDATION_BONUS = 10000; // 100%
     uint256 constant LIQUIDATION_DISCOUNT = 1000; // 10%
+        uint256 constant MIN_LIQUIDATION_THRESHOLD = 5000; //50%
+
     uint256 constant MAX_RESERVE_FACTOR = 5000; // 50%
     address constant LINK = 0xE4aB69C077896252FAFBD49EFD26B5D171A32410;
 

@@ -17,6 +17,7 @@ import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggreg
 import {IDiamondCut} from "../contracts/interfaces/IDiamondCut.sol";
 import {CCIPLocalSimulatorFork, Register} from "@chainlink/local/src/ccip/CCIPLocalSimulatorFork.sol";
 
+
 contract Base is Test, IDiamondCut {
     // HUB
     Diamond diamond;
@@ -404,7 +405,204 @@ contract Base is Test, IDiamondCut {
         ERC20Mock(_token).approve(address(sharedFacet), _amount);
         sharedFacet.depositCollateral(_token, _amount);
     }
+    ///////////////////////////
+    // LENDING POOL DEPOSIT
+    /////////////////////////
+    function _depositIntoLiquidityPool(
+        address _token, uint256 _amount
+    ) public {
+         ERC20Mock(_token).approve(address(liquidityPoolFacet), _amount);
+         liquidityPoolFacet.deposit(_token, _amount);
+    }
 
+     function _deployVault(address token, string memory name, string memory symbol) public returns (address){
+       return liquidityPoolFacet.deployProtocolAssetVault(token, name, symbol);
+    }
+
+    
+
+
+
+function _intializeProtocolPool(address tokenAddress) public {
+    switchSigner(owner);
+    vm.deal(owner, 10000000 ether);
+
+// Parameters
+uint256 _reserveFactor = 2000; // 20%
+uint256 _optimalUtilization = 8000; // 80%
+uint256 _baseRate = 500; // 5%
+uint256 _slopeRate = 2000; // 20%
+uint256 _initialSupply = 100 ether;
+
+OwnershipFacet(address(diamond)).initializeProtocolPool(
+tokenAddress, _reserveFactor, _optimalUtilization, _baseRate, _slopeRate
+);
+
+// (address token,,, uint256 reserveFactor, uint256 optimalUtilization,,, bool isActive,) =
+// liquidityPoolFacet.getProtocolPoolConfig(ETH_CONTRACT_ADDRESS);
+
+// assertEq(token, ETH_CONTRACT_ADDRESS);
+// assertEq(_reserveFactor, reserveFactor);
+// assertEq(_optimalUtilization, optimalUtilization);
+// assertTrue(isActive);
+
+
+
+    }
+
+
+
+
+
+  function xdepositIntoLiquidityPool(
+        address _token, 
+        uint256 _amount,
+        uint256 _fork,
+        address _user
+    ) public {
+        if (_token == ETH_CONTRACT_ADDRESS) {
+            revert("ETH is not supported use _xDepositNativeCollateral");
+        }
+        if (_fork == hubFork) {
+        //    _deployVault(_token, "name", "symbol");
+            _depositIntoLiquidityPool(_token, _amount);
+            return;
+        }
+
+        if (_fork == arbFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, 1 ether);
+             vm.startPrank(_user);
+            ERC20Mock(_token).approve(address(arbSpokeContract), _amount);
+            arbSpokeContract.deposit{value: 1 ether}(_token, _amount);
+             vm.stopPrank();
+        }
+
+        if (_fork == avaxFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, 1 ether);
+            vm.startPrank(_user);
+            ERC20Mock(_token).approve(address(avaxSpokeContract), _amount);
+            avaxSpokeContract.deposit{value: 1 ether}(
+                _token,
+                _amount
+            );
+            vm.stopPrank();
+        }
+        //give ccipLocalSimulatorFork the ability to route messages
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+
+
+    }
+
+  function _xWithdrawnFromPool(
+    address _token,
+    uint256 _amount, 
+    uint256 _fork,
+    address _user
+) public {
+    if (_fork == hubFork) {
+        liquidityPoolFacet.withdraw(_token, _amount); 
+        return;
+    }
+
+    if (_fork == arbFork) {
+        vm.selectFork(_fork);
+        vm.deal(_user, 1 ether);
+        arbSpokeContract.withdraw{value: 1 ether}(
+            _token,
+            _amount
+        );
+    }
+
+    if (_fork == avaxFork) {
+        vm.selectFork(_fork);
+        vm.deal(_user, 1 ether);
+        avaxSpokeContract.withdraw{value: 1 ether}(
+            _token,
+            _amount
+        );
+    }
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(_fork);
+}
+
+
+function _xborrowFromPool(
+    address _token,
+    uint256 _amount, 
+    uint256 _fork,
+    address _user
+) public {
+    if (_fork == hubFork) {
+        liquidityPoolFacet.borrowFromPool(_token, _amount); 
+        return;
+    }
+
+    if (_fork == arbFork) {
+        vm.selectFork(_fork);
+        vm.deal(_user, 1 ether);
+        arbSpokeContract.borrowFromPool{value: 1 ether}(
+            _token,
+            _amount
+        );
+    }
+
+    if (_fork == avaxFork) {
+        vm.selectFork(_fork);
+        vm.deal(_user, 1 ether);
+        avaxSpokeContract.borrowFromPool{value: 1 ether}( 
+            _token,
+            _amount
+        );
+    }
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(_fork);
+}
+
+
+    function xRepayFromPool(
+        address _token,
+         uint256 _amount, 
+         uint256 _fork,
+         address _user
+    ) public {
+
+          if (_token == ETH_CONTRACT_ADDRESS) {
+            revert("ETH is not supported use _xDepositNativeCollateral");
+        }
+        if (_fork == hubFork) {
+            liquidityPoolFacet.repay(_token, _amount);
+            return;
+        }
+
+        if (_fork == arbFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, 1 ether);
+            ERC20Mock(_token).approve(address(arbSpokeContract), _amount);
+            arbSpokeContract.repay{value: 1 ether}(_token, _amount);
+        }
+
+        if (_fork == avaxFork) {
+            vm.selectFork(_fork);
+            vm.deal(_user, 1 ether);
+            ERC20Mock(_token).approve(address(avaxSpokeContract), _amount);
+            avaxSpokeContract.repay{value: 1 ether}(
+                _token,
+                _amount
+            );
+        }
+        //give ccipLocalSimulatorFork the ability to route messages
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+
+
+
+    }
+
+
+    /////////////////////////
+    /////////////////////////
+    /////////////////////////
     function _xDepositCollateral(
         address _token,
         uint256 _amount,
@@ -511,6 +709,8 @@ contract Base is Test, IDiamondCut {
         );
     }
 
+   
+
     function generateSelectors(
         string memory _facetName
     ) internal returns (bytes4[] memory selectors) {
@@ -541,7 +741,7 @@ contract Base is Test, IDiamondCut {
     }
 
     function _dripLink(uint256 _amount, address _user, uint256 _fork) public {
-        vm.startPrank(owner);
+        vm.startPrank(_user);
         if (_fork == hubFork) {
             vm.selectFork(_fork);
             ERC20Mock(LINK_CONTRACT_ADDRESS).mint(_user, _amount);
