@@ -105,3 +105,8 @@ error ProtocolPool__NoDebt();
 error Protocol__LiquidationTooSmall();
 error Protocol__NoCollateralToSeize();
 error ProtocolPool__PositionStillHealthy();
+
+error ProtocolPool__NoVaultForToken();
+error ProtocolPool__NoTokensToWithdraw();
+error ProtocolPool__InsufficientVaultTokens();
+error ProtocolPool__InconsistentUserBalance();

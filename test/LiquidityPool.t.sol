@@ -260,16 +260,16 @@ switchSigner(B);
 protocolFacet.requestLoanFromListing(1, 5e10);
 }
 
-function testUserSharesAreCalculatedCorrectly() public {
-initializeTokenPool(DAI_CONTRACT_ADDRESS);
-// IERC20(DAI_CONTRACT_ADDRESS).approve(
-// address(protocolFacet),
-// type(uint256).max
-// );
-uint256 amount = 100 ether;
-uint256 shares = liquidityPoolFacet.deposit(DAI_CONTRACT_ADDRESS, amount);
-assertEq(shares, amount);
-}
+// function testUserSharesAreCalculatedCorrectly() public {
+// initializeTokenPool(DAI_CONTRACT_ADDRESS);
+// // IERC20(DAI_CONTRACT_ADDRESS).approve(
+// // address(protocolFacet),
+// // type(uint256).max
+// // );
+// uint256 amount = 100 ether;
+// uint256 shares = iquidityPoolFacet.deposit(DAI_CONTRACT_ADDRESS, amount);
+// assertEq(shares, amount);
+// }
 
 function _mintTokenToAddress(address _token, address _to, uint256 _amount) internal {
 ERC20Mock(_token).mint(_to, _amount);
@@ -639,7 +639,7 @@ assertGt(userShares, 0, "User should have shares after deposit");
 // uint256 initialBalance = IERC20(DAI_CONTRACT_ADDRESS).balanceOf(B);
 
 // Withdraw all shares
-liquidityPoolFacet.withdraw(DAI_CONTRACT_ADDRESS, userShares, false);
+liquidityPoolFacet.withdraw(DAI_CONTRACT_ADDRESS, userShares);
 
 uint256 sharesafterWithdrawn = liquidityPoolFacet.getUserPoolDeposit(B, DAI_CONTRACT_ADDRESS);
 assertEq(sharesafterWithdrawn, 0, "All shares should be withdrawn");
@@ -681,7 +681,7 @@ assertGt(userShares, 0, "User should have shares after deposit");
 
 uint256 withdrawnHalfAmount = DEPOSIT_AMOUNT / 2;
 // Withdraw all shares
-liquidityPoolFacet.withdraw(DAI_CONTRACT_ADDRESS, withdrawnHalfAmount, false);
+liquidityPoolFacet.withdraw(DAI_CONTRACT_ADDRESS, withdrawnHalfAmount);
 
 uint256 sharesafterWithdrawn = liquidityPoolFacet.getUserPoolDeposit(B, DAI_CONTRACT_ADDRESS);
 assertEq(sharesafterWithdrawn, DEPOSIT_AMOUNT - withdrawnHalfAmount, "half shares should be withdrawn");

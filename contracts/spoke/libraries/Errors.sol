@@ -10,3 +10,5 @@ error Spoke__InsufficientFee();
 error Spoke__TokenNotSupported();
 error Spoke__NotHub();
 error Spoke__TransferFailed();
+error Spoke__ZeroAmount();
+               

@@ -36,6 +36,7 @@ uint256 _amount,
 address _user,
 uint64 _chainSelector
 ) internal returns (uint256 shares) {
+    
 if (!_appStorage.s_protocolPool[_token].initialize) {
 revert ProtocolPool__NotInitialized();
 }
@@ -250,167 +251,105 @@ tokenData.poolLiquidity += amountRepaid;
 emit Repay(_user, _token, amountRepaid, _chainSelector);
 }
 
+
 /**
-* @dev Allows users to withdraw tokens from the liquidity pool
-* @param _appStorage The app storage layout
-* @param _token The address of the token to withdraw
-* @param _amount The amount of token to withdraw and burn corresponding shares
-* @param _user The address of the user withdrawing
-* @param _fromVault Whether to withdraw from vault or direct pool
-* @param _chainSelector The chain selector for cross-chain operations
-* @return amountWithdrawn The actual amount of tokens withdrawn
-*/
+ * @dev Allows users to withdraw tokens from the liquidity pool using vault tokens only
+ * @param _appStorage The app storage layout
+ * @param _token The address of the token to withdraw
+ * @param _amount The amount of token to withdraw (0 for max withdrawal)
+ * @param _user The address of the user withdrawing
+ * @return amountWithdrawn The actual amount of tokens withdrawn
+ */
 function _withdraw(
-LibAppStorage.Layout storage _appStorage,
-address _token,
-uint256 _amount,
-address _user,
-bool _fromVault,
-uint64 _chainSelector
+    LibAppStorage.Layout storage _appStorage,
+    address _token,
+    uint256 _amount,
+    address _user,
+    uint64 _chainSelector
 ) internal returns (uint256 amountWithdrawn) {
-// Validate withdraw conditions
-if (!_appStorage.s_protocolPool[_token].initialize) {
-revert ProtocolPool__NotInitialized();
+    // Validate withdraw conditions
+    if (!_appStorage.s_protocolPool[_token].initialize) {
+        revert ProtocolPool__NotInitialized();
+    }
+    if (!_appStorage.s_isLoanable[_token]) {
+        revert ProtocolPool__TokenNotSupported();
+    }
+
+    // Get vault address - vault tokens are the ONLY way to represent deposits
+    address vaultAddress = _appStorage.s_vaults[_token];
+    if (vaultAddress == address(0)) {
+        revert ProtocolPool__NoVaultForToken();
+    }
+
+    // Get vault instance and user's vault token balance
+    ILendbitTokenVault vault = ILendbitTokenVault(vaultAddress);
+    uint256 userVaultTokens = IERC20(vaultAddress).balanceOf(_user);
+    
+    if (userVaultTokens == 0) {
+        revert ProtocolPool__NoTokensToWithdraw();
+    }
+
+    // CONSISTENCY CHECK: Verify vault tokens match stored balance
+    if (userVaultTokens != _appStorage.s_addressToUserPoolShare[_user][_token]) {
+        revert ProtocolPool__InconsistentUserBalance();
+    }
+
+    // Calculate withdrawal amounts
+    uint256 sharesToBurn;
+    if (_amount == 0) {
+        // Withdraw all vault tokens
+        sharesToBurn = userVaultTokens;
+        amountWithdrawn = Utils.convertToAmount(_appStorage.s_tokenData[_token], sharesToBurn);
+    } else {
+        // Withdraw specific amount
+        sharesToBurn = Utils.convertToShares(_appStorage.s_tokenData[_token], _amount);
+        if (userVaultTokens < sharesToBurn) {
+            revert ProtocolPool__InsufficientVaultTokens();
+        }
+        amountWithdrawn = _amount;
+    }
+
+    // Get storage references
+    TokenData storage tokenData = _appStorage.s_tokenData[_token];
+    ProtocolPool storage protocolPool = _appStorage.s_protocolPool[_token];
+
+    // Validate liquidity
+    if (tokenData.poolLiquidity == 0) {
+        revert ProtocolPool__NoLiquidity();
+    }
+    if (tokenData.poolLiquidity < amountWithdrawn) {
+        revert ProtocolPool__NotEnoughLiquidity();
+    }
+
+    // Update borrow index before state changes
+    LibInterestAccure.updateBorrowIndex(tokenData, protocolPool);
+
+    // Burn vault tokens (ONLY source of truth for user balance)
+    vault.burnFor(_user, sharesToBurn);
+
+    // Update protocol state - ALL share tracking must be consistent
+    protocolPool.totalSupply -= sharesToBurn;
+    tokenData.totalSupply -= sharesToBurn;
+    tokenData.poolLiquidity -= amountWithdrawn;
+    tokenData.lastUpdateTimestamp = block.timestamp;
+
+    // Update vault deposits tracking
+    _appStorage.s_vaultDeposits[_token] -= sharesToBurn;
+    
+    // CRITICAL FIX: Update user's stored balance to match vault tokens
+    _appStorage.s_addressToUserPoolShare[_user][_token] -= sharesToBurn;
+
+    // Transfer tokens directly to user
+    if (_token == Constants.NATIVE_TOKEN) {
+        (bool success,) = payable(_user).call{value: amountWithdrawn}("");
+        require(success, "ETH transfer failed");
+    } else {
+        IERC20(_token).safeTransfer(_user, amountWithdrawn);
+    }
+
+    // Emit withdrawal event
+    emit Withdraw(_user, _token, amountWithdrawn, sharesToBurn, _chainSelector);
 }
-if (_amount == 0) revert ProtocolPool__ZeroAmount();
-if (!_appStorage.s_isLoanable[_token]) {
-revert ProtocolPool__TokenNotSupported();
-}
-
-// Get storage references
-TokenData storage tokenData = _appStorage.s_tokenData[_token];
-ProtocolPool storage protocolPool = _appStorage.s_protocolPool[_token];
-
-// Handle vault withdrawal if requested
-if (_fromVault) {
-return _withdrawFromVault(_appStorage, _token, _amount, _user, _chainSelector);
-}
-
-// Regular pool withdrawal
-uint256 shares = Utils.convertToShares(_appStorage.s_tokenData[_token], _amount);
-uint256 userShares = _appStorage.s_addressToUserPoolShare[_user][_token];
-
-if (userShares < shares) revert ProtocolPool__InsufficientShares();
-
-// Ensure pool has liquidity
-if (tokenData.poolLiquidity == 0) revert ProtocolPool__NoLiquidity();
-
-// Update borrow index to accrue interest before withdrawal
-LibInterestAccure.updateBorrowIndex(tokenData, protocolPool);
-
-// Ensure pool has enough liquidity to fulfill the withdrawal
-if (tokenData.poolLiquidity < _amount) {
-revert ProtocolPool__NotEnoughLiquidity();
-}
-
-// Update user's share balance
-_appStorage.s_addressToUserPoolShare[_user][_token] -= shares;
-
-// Update protocol pool state
-protocolPool.totalSupply -= shares;
-tokenData.totalSupply -= shares;
-tokenData.poolLiquidity -= _amount;
-tokenData.lastUpdateTimestamp = block.timestamp;
-
-// Burn the user's shares in the VToken Vault if vault exists
-
-address vaultAddress = _appStorage.s_vaults[_token];
-if (vaultAddress != address(0)) {
-ILendbitTokenVault(vaultAddress).burnFor(_user, shares);
-}
-_appStorage.s_vaultDeposits[_token] -= shares;
-
-// Transfer tokens to user
-if (_token == Constants.NATIVE_TOKEN) {
-(bool success,) = payable(_user).call{value: _amount}("");
-require(success, "ETH transfer failed");
-} else {
-IERC20(_token).safeTransfer(_user, _amount);
-}
-
-amountWithdrawn = _amount;
-
-// Emit an event for the withdrawal
-emit Withdraw(_user, _token, _amount, shares, _chainSelector);
-}
-
-/**
-* @dev Withdraw from vault tokens
-* @param _appStorage The app storage layout
-* @param _token The address of the token
-* @param _amount The amount to withdraw (0 for max)
-* @param _user The user address
-* @param _chainSelector Chain selector
-* @return withdrawn Amount withdrawn
-*/
-function _withdrawFromVault(
-LibAppStorage.Layout storage _appStorage,
-address _token,
-uint256 _amount,
-address _user,
-uint64 _chainSelector
-) internal returns (uint256 withdrawn) {
-// Get vault address
-address vaultAddress = _appStorage.s_vaults[_token];
-require(vaultAddress != address(0), "No vault for this token");
-
-// Get vault instance
-ILendbitTokenVault vault = ILendbitTokenVault(vaultAddress);
-
-// Get user's vault token balance
-uint256 vaultTokens = IERC20(vaultAddress).balanceOf(_user);
-require(vaultTokens > 0, "No vault tokens");
-
-// Calculate shares to burn
-uint256 sharesToBurn;
-if (_amount == 0) {
-// Withdraw all
-sharesToBurn = vaultTokens;
-
-withdrawn = Utils.convertToAmount(_appStorage.s_tokenData[_token], sharesToBurn);
-} else {
-// Withdraw specific amount
-sharesToBurn = Utils.convertToShares(_appStorage.s_tokenData[_token], _amount);
-require(vaultTokens >= sharesToBurn, "Insufficient vault tokens");
-withdrawn = _amount;
-}
-
-// Get storage references
-TokenData storage tokenData = _appStorage.s_tokenData[_token];
-ProtocolPool storage protocolPool = _appStorage.s_protocolPool[_token];
-
-// Ensure pool has enough liquidity
-if (tokenData.poolLiquidity < withdrawn) {
-revert ProtocolPool__NotEnoughLiquidity();
-}
-
-// Update borrow index
-LibInterestAccure.updateBorrowIndex(tokenData, protocolPool);
-
-// Burn vault tokens
-vault.burnFor(_user, sharesToBurn);
-
-// Update protocol state
-protocolPool.totalSupply -= sharesToBurn;
-tokenData.totalSupply -= sharesToBurn;
-tokenData.poolLiquidity -= withdrawn;
-tokenData.lastUpdateTimestamp = block.timestamp;
-
-// Update user pool shares
-_appStorage.s_addressToUserPoolShare[_user][_token] -= sharesToBurn;
-
-// Transfer tokens to user
-if (_token == Constants.NATIVE_TOKEN) {
-(bool success,) = payable(_user).call{value: withdrawn}("");
-require(success, "ETH transfer failed");
-} else {
-IERC20(_token).safeTransfer(_user, withdrawn);
-}
-
-// Emit withdrawal event
-emit Withdraw(_user, _token, withdrawn, sharesToBurn, _chainSelector);
-}
-
 /**
 * @dev Calculates the current debt for a specific user including accrued interest
 * @param tokenData The token data with current index
