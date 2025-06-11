@@ -100,7 +100,9 @@ library LibCCIP {
         }
         if (_messageType == CCIPMessageType.BORROW_FROM_LISTING) {
             //decode the data
-            (address _token, uint256 _amount, address _user) = abi.decode(_messageData, (address, uint256, address));
+            (address _user, uint96 _listingId, uint256 _amount) = abi.decode(_messageData, (address, uint96, uint256));
+
+            _appStorage._requestLoanFromListing(_user, _listingId, _amount, _sourceChainSelector);
         }
         if (_messageType == CCIPMessageType.REPAY_LOAN) {
             //decode the data
