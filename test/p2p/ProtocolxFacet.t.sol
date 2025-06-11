@@ -141,6 +141,44 @@ contract ProtocolxFacetTest is Base {
         LoanListing memory _listing = gettersFacet.getLoanListing(1);
         assertEq(_listing.amount, 50 ether - 30 ether);
         assertEq(uint8(_listing.listingStatus), uint8(ListingStatus.OPEN));
+
+        Request memory _request = gettersFacet.getRequest(1);
+        assertEq(_request.author, B);
+        assertEq(_request.lender, owner);
+        assertEq(_request.amount, 30 ether);
+    }
+
+    function test_repayLoan() public {
+        _xCreateLoanListing();
+        _dripLink(200 ether, B, avaxFork);
+        vm.deal(B, 10 ether);
+        switchSigner(B);
+        _xDepositCollateral(AVAX_LINK_CONTRACT_ADDRESS, 100 ether, avaxFork, B);
+
+        vm.selectFork(arbFork);
+        vm.deal(B, 10 ether);
+        switchSigner(B);
+
+        bytes32 messageId = arbSpokeContract.requestLoanFromListing{value: 1 ether}(1, 30 ether);
+        assert(messageId != bytes32(0));
+
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+        Request memory _request = gettersFacet.getRequest(1);
+
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+
+        vm.selectFork(avaxFork);
+        vm.deal(B, 10 ether);
+        switchSigner(B);
+        ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).approve(address(avaxSpokeContract), _request.totalRepayment);
+        messageId = avaxSpokeContract.repayLoan{value: 1 ether}(1, AVAX_LINK_CONTRACT_ADDRESS, _request.totalRepayment);
+        assert(messageId != bytes32(0));
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+
+        uint256 _lenderBalance = gettersFacet.getAddressToAvailableBalance(owner, LINK_CONTRACT_ADDRESS);
+        Request memory _requestAfterRepay = gettersFacet.getRequest(1);
+        assertEq(uint8(_requestAfterRepay.status), uint8(Status.CLOSED));
+        assertEq(_lenderBalance, 31185000000000000000); // totalRepayment - fees
     }
 
     function _xCreateLendingRequest(

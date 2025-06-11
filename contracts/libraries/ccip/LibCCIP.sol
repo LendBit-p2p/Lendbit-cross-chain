@@ -91,11 +91,7 @@ library LibCCIP {
 
             // service the request
             _appStorage._serviceLendingRequest(
-                _requestId,
-                _destTokenAmounts[0].token,
-                _destTokenAmounts[0].amount,
-                _isNative,
-                _user
+                _requestId, _destTokenAmounts[0].token, _destTokenAmounts[0].amount, _isNative, _user
             );
         }
         if (_messageType == CCIPMessageType.BORROW_FROM_LISTING) {
@@ -106,7 +102,9 @@ library LibCCIP {
         }
         if (_messageType == CCIPMessageType.REPAY_LOAN) {
             //decode the data
-            (address _token, uint256 _amount, address _user) = abi.decode(_messageData, (address, uint256, address));
+            (uint96 _requestId, uint256 _amount, address _user) = abi.decode(_messageData, (uint96, uint256, address));
+
+            _appStorage._repayLoan(_user, _requestId, _amount, _sourceChainSelector);
         }
 
         // Shared

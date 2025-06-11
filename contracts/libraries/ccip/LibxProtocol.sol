@@ -15,9 +15,8 @@ import "../../model/Event.sol";
 import "../../utils/validators/Error.sol";
 import "../../utils/validators/Validator.sol";
 import "../../utils/constants/Constant.sol";
-import "../LibAppStorage.sol";
-import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.sol";
-import {LibCCIP} from "./LibCCIP.sol";
+
+import {LibProtocol} from "../LibProtocol.sol";
 
 library LibxProtocol {
     using SafeERC20 for IERC20;
@@ -38,10 +37,7 @@ library LibxProtocol {
         if (_foundRequest.status != Status.OPEN) {
             revert Protocol__RequestNotOpen();
         }
-        if (
-            _foundRequest.loanRequestAddr != _tokenAddress &&
-            _foundRequest.loanRequestAddr != Constants.NATIVE_TOKEN
-        ) {
+        if (_foundRequest.loanRequestAddr != _tokenAddress && _foundRequest.loanRequestAddr != Constants.NATIVE_TOKEN) {
             revert Protocol__InvalidToken();
         }
         if (_foundRequest.author == _user) {
@@ -62,25 +58,16 @@ library LibxProtocol {
         if (_foundRequest.sourceChain == Constants.CHAIN_SELECTOR) {
             if (_isNative) {
                 IWERC20(_tokenAddress).withdraw(_amount);
-                (bool success, ) = address(_foundRequest.author).call{
-                    value: _amount
-                }("");
+                (bool success,) = address(_foundRequest.author).call{value: _amount}("");
                 if (!success) {
                     revert Protocol__TransferFailed();
                 }
             } else {
-                IERC20(_tokenAddress).safeTransfer(
-                    address(_foundRequest.author),
-                    _amount
-                );
+                IERC20(_tokenAddress).safeTransfer(address(_foundRequest.author), _amount);
             }
         } else {
-            Client.EVMTokenAmount[]
-                memory _destTokenAmounts = new Client.EVMTokenAmount[](1);
-            _destTokenAmounts[0] = Client.EVMTokenAmount({
-                token: _tokenAddress,
-                amount: _amount
-            });
+            Client.EVMTokenAmount[] memory _destTokenAmounts = new Client.EVMTokenAmount[](1);
+            _destTokenAmounts[0] = Client.EVMTokenAmount({token: _tokenAddress, amount: _amount});
             LibCCIP._sendTokenCrosschain(
                 _appStorage.s_senderSupported[_foundRequest.sourceChain],
                 _isNative,
@@ -197,6 +184,7 @@ library LibxProtocol {
         _newRequest.loanRequestAddr = _listing.tokenAddress;
         _newRequest.collateralTokens = _collateralTokens;
         _newRequest.status = Status.SERVICED;
+        _newRequest.sourceChain = _chainSelector;
 
         // Calculate collateral to lock for each token, proportional to its USD value
         uint256 collateralToLock = Utils.calculateColateralToLock(_loanUsdValue, maxLoanableAmount);
@@ -250,5 +238,63 @@ library LibxProtocol {
         // Emit events to notify the loan request creation and servicing
         emit RequestCreated(_borrower, _appStorage.requestId, _amount, _listing.interest, _chainSelector);
         emit RequestServiced(_newRequest.requestId, _newRequest.lender, _newRequest.author, _amount, _chainSelector);
+    }
+
+    function _repayLoan(
+        LibAppStorage.Layout storage _appStorage,
+        address _user,
+        uint96 _requestId,
+        uint256 _amount,
+        uint64 _chainSelector // payable
+    ) internal {
+        Validator._moreThanZero(_amount);
+
+        Request storage _request = _appStorage.request[_requestId];
+
+        // Ensure that the loan request is currently serviced and the caller is the original borrower
+        if (_request.status != Status.SERVICED) {
+            revert Protocol__RequestNotServiced();
+        }
+        if (_user != _request.author) revert Protocol__NotOwner();
+
+        // If full repayment is made, close the request and release the collateral
+        if (_amount >= _request.totalRepayment) {
+            _amount = _request.totalRepayment;
+            _request.totalRepayment = 0;
+            _request.status = Status.CLOSED;
+
+            for (uint256 i = 0; i < _request.collateralTokens.length; i++) {
+                address collateralToken = _request.collateralTokens[i];
+                _appStorage.s_addressToAvailableBalance[_request.author][collateralToken] +=
+                    _appStorage.s_idToCollateralTokenAmount[_requestId][collateralToken];
+
+                delete _appStorage.s_idToCollateralTokenAmount[_requestId][collateralToken];
+            }
+        } else {
+            // Reduce the outstanding repayment amount for partial payments
+            _request.totalRepayment -= _amount;
+        }
+
+        (, uint256 _amountAfterFees) = LibProtocol._settleFees(_appStorage, _request.loanRequestAddr, _amount);
+
+        // Update borrower’s loan collected metrics in USD
+        uint8 decimal = LibGettersImpl._getTokenDecimal(_request.loanRequestAddr);
+        uint256 _loanUsdValue =
+            LibGettersImpl._getUsdValue(_appStorage, _request.loanRequestAddr, _amountAfterFees, decimal);
+        uint256 loanCollected = LibGettersImpl._getLoanCollectedInUsd(_appStorage, _user);
+
+        // Deposit the repayment amount to the lender's available balance
+        _appStorage.s_addressToCollateralDeposited[_request.lender][_request.loanRequestAddr] += _amountAfterFees;
+        _appStorage.s_addressToAvailableBalance[_request.lender][_request.loanRequestAddr] += _amountAfterFees;
+
+        // Adjust the borrower's total loan collected
+        if (loanCollected > _loanUsdValue) {
+            _appStorage.addressToUser[_user].totalLoanCollected = loanCollected - _loanUsdValue;
+        } else {
+            _appStorage.addressToUser[_user].totalLoanCollected = 0;
+        }
+
+        // Emit event to notify of loan repayment
+        emit LoanRepayment(_user, _requestId, _amount, _chainSelector);
     }
 }
