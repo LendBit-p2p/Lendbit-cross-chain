@@ -102,4 +102,17 @@ library Validator {
         }
         revert Protocol__NotWhitelisted();
     }
+
+    function _addressIsWhitelisted(LoanListing storage _listing, address _user) internal view {
+        address[] memory _whitelist = _listing.whitelist;
+        if (_whitelist.length == 0) {
+            return;
+        }
+        for (uint256 i = 0; i < _whitelist.length; i++) {
+            if (_whitelist[i] == _user) {
+                return;
+            }
+        }
+        revert Protocol__NotWhitelisted();
+    }
 }
