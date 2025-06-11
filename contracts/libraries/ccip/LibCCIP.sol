@@ -11,11 +11,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Constants} from "../../utils/constants/Constant.sol";
 import {LibxShared} from "./LibxShared.sol";
 import {LibxLiquidityPool} from "./LibxLiquidityPool.sol";
+import {LibxProtocol} from "./LibxProtocol.sol";
 
 library LibCCIP {
     using LibxShared for LibAppStorage.Layout;
     using LibProtocol for LibAppStorage.Layout;
     using LibxLiquidityPool for LibAppStorage.Layout;
+    using LibxProtocol for LibAppStorage.Layout;
 
     function _resolveCCIPMessage(
         LibAppStorage.Layout storage _appStorage,
@@ -104,19 +106,40 @@ library LibCCIP {
         if (_messageType == CCIPMessageType.CREATE_REQUEST) {
             //decode the data
             (
-                address token,
-                uint256 amount,
-                uint256 interestRate,
-                uint256 duration
-            ) = abi.decode(_messageData, (address, uint256, uint256, uint256));
+                uint256 _amount,
+                uint16 _interestRate,
+                uint256 _duration,
+                address _token,
+                address _user
+            ) = abi.decode(
+                    _messageData,
+                    (uint256, uint16, uint256, address, address)
+                );
 
             // create the request
+            _appStorage._createLendingRequest(
+                _amount,
+                _interestRate,
+                _duration,
+                _token,
+                _sourceChainSelector,
+                _user
+            );
         }
         if (_messageType == CCIPMessageType.SERVICE_REQUEST) {
             //decode the data
-            (address _token, uint256 _amount, uint96 _requestId) = abi.decode(
+            (uint96 _requestId, bool _isNative, address _user) = abi.decode(
                 _messageData,
-                (address, uint256, uint96)
+                (uint96, bool, address)
+            );
+
+            // service the request
+            _appStorage._serviceLendingRequest(
+                _requestId,
+                _destTokenAmounts[0].token,
+                _destTokenAmounts[0].amount,
+                _isNative,
+                _user
             );
         }
         if (_messageType == CCIPMessageType.BORROW_FROM_LISTING) {

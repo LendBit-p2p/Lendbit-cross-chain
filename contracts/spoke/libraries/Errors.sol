@@ -11,4 +11,7 @@ error Spoke__TokenNotSupported();
 error Spoke__NotHub();
 error Spoke__TransferFailed();
 error Spoke__ZeroAmount();
-               
+error Spoke__InvalidAmount();
+error Spoke__InvalidInterest();
+error Spoke__DateMustBeInFuture();
+error Spoke__InvalidRequest();

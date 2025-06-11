@@ -395,12 +395,69 @@ contract SpokeContract is CCIPReceiver {
      * @param _loanCurrency The currency of the loan
      */
     function createLendingRequest(
-        uint128 _amount,
+        uint256 _amount,
         uint16 _interest,
         uint256 _returnDate,
         address _loanCurrency
-    ) external {
-        //TODO: // Currently Working on the Todo
+    ) external payable returns (bytes32) {
+        if (!s_isTokenSupported[_loanCurrency])
+            revert Spoke__TokenNotSupported();
+
+        if (_amount == 0) revert Spoke__InvalidAmount();
+        if (_interest == 0) revert Spoke__InvalidInterest();
+
+        if (_returnDate < block.timestamp + 1 days)
+            revert Spoke__DateMustBeInFuture();
+
+        bytes memory messageData = abi.encode(
+            CCIPMessageType.CREATE_REQUEST,
+            abi.encode(
+                _amount,
+                _interest,
+                _returnDate,
+                s_tokenToHubTokens[_loanCurrency],
+                msg.sender
+            )
+        );
+
+        Client.EVMTokenAmount[]
+            memory tokensToSendDetails = new Client.EVMTokenAmount[](0);
+
+        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(i_hub),
+            data: messageData,
+            tokenAmounts: tokensToSendDetails,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({
+                    gasLimit: 600_000,
+                    allowOutOfOrderExecution: true
+                })
+            ),
+            feeToken: address(0)
+        });
+
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(
+            i_chainSelector,
+            message
+        );
+
+        if (msg.value < fee) {
+            revert Spoke__InsufficientFee();
+        }
+
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(
+            i_chainSelector,
+            message
+        );
+
+        emit CCIPMessageSent(
+            messageId,
+            i_chainSelector,
+            msg.sender,
+            tokensToSendDetails
+        );
+
+        return messageId;
     }
 
     /**
@@ -410,9 +467,81 @@ contract SpokeContract is CCIPReceiver {
      */
     function serviceRequest(
         uint96 _requestId,
-        address _tokenAddress
-    ) external payable {
-        //TODO: // Currently Working on the Todo
+        address _tokenAddress,
+        uint256 _amount
+    ) external payable returns (bytes32) {
+        if (!s_isTokenSupported[_tokenAddress])
+            revert Spoke__TokenNotSupported();
+
+        Validitions.validateTokenParams(_tokenAddress, _amount);
+
+        if (_requestId == 0) revert Spoke__InvalidRequest();
+
+        bytes memory messageData = abi.encode(
+            CCIPMessageType.SERVICE_REQUEST,
+            abi.encode(_requestId, _tokenAddress == NATIVE_TOKEN, msg.sender)
+        );
+
+        Client.EVMTokenAmount[]
+            memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
+        tokensToSendDetails[0] = Client.EVMTokenAmount({
+            token: _tokenAddress == NATIVE_TOKEN
+                ? address(i_weth)
+                : _tokenAddress,
+            amount: _amount
+        });
+
+        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(i_hub),
+            data: messageData,
+            tokenAmounts: tokensToSendDetails,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({
+                    gasLimit: 500_000,
+                    allowOutOfOrderExecution: true
+                })
+            ),
+            feeToken: address(0)
+        });
+
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(
+            i_chainSelector,
+            message
+        );
+
+        if (_tokenAddress == NATIVE_TOKEN && msg.value < (fee + _amount)) {
+            revert Spoke__InsufficientNativeCollateral();
+        } else {
+            if (msg.value < fee) {
+                revert Spoke__InsufficientFee();
+            }
+        }
+
+        if (_tokenAddress == NATIVE_TOKEN) {
+            i_weth.deposit{value: _amount}();
+            IERC20(address(i_weth)).approve(address(i_ccipRouter), _amount);
+        } else {
+            IERC20(_tokenAddress).safeTransferFrom(
+                msg.sender,
+                address(this),
+                _amount
+            );
+            IERC20(_tokenAddress).approve(address(i_ccipRouter), _amount);
+        }
+
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: fee}(
+            i_chainSelector,
+            message
+        );
+
+        emit CCIPMessageSent(
+            messageId,
+            i_chainSelector,
+            msg.sender,
+            tokensToSendDetails
+        );
+
+        return messageId;
     }
 
     /**
