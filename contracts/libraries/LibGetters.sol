@@ -8,6 +8,12 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../model/Protocol.sol";
 import "../utils/validators/Error.sol";
 
+import {LibInterestRateModel} from "./LibInterestRateModel.sol";
+import {LibInterestAccure} from "./LibInterestAccure.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+
+
 library LibGettersImpl {
     /**
      * @dev Converts a specified token amount to its USD-equivalent value based on
@@ -382,4 +388,85 @@ library LibGettersImpl {
     {
         return _appStorage.s_feesAccrued[_token];
     }
+
+    /**
+* @notice Calculates the current debt for a specific user including accrued interest
+* @param userBorrowData The user's borrow data from storage
+* @param tokenData The token's data from storage
+* @param protocolPool The protocol pool data from storage
+* @return debt The current debt amount including interest
+*/
+function calculateUserDebt(
+UserBorrowData memory userBorrowData,
+TokenData memory tokenData,
+ProtocolPool memory protocolPool
+) internal view returns (uint256 debt) {
+if (!userBorrowData.isActive || userBorrowData.borrowedAmount == 0) {
+return 0;
+}
+
+if (block.timestamp == tokenData.lastUpdateTimestamp || tokenData.totalBorrows == 0) {
+return userBorrowData.borrowedAmount;
+}
+
+if (userBorrowData.borrowIndex == 0) {
+return userBorrowData.borrowedAmount;
+}
+
+uint256 timeElapsed = block.timestamp - tokenData.lastUpdateTimestamp;
+uint256 utilization = LibInterestRateModel.calculateUtilization(tokenData.totalBorrows, tokenData.poolLiquidity);
+uint256 interestRate = LibInterestRateModel.calculateInterestRate(protocolPool, utilization);
+uint256 factor = ((interestRate * timeElapsed) * 1e18) / (10000 * 31536000);
+uint256 currentBorrowIndex = tokenData.borrowIndex + ((tokenData.borrowIndex * factor) / 1e18);
+debt = (userBorrowData.borrowedAmount * currentBorrowIndex) / userBorrowData.borrowIndex;
+
+return debt;
+}
+
+/**
+* @notice Get vault info for a specific token
+* @param token The token address
+* @return exists Whether vault exists
+* @return vaultAddress The vault address
+* @return totalDeposits Total deposits in the vault
+*/
+function _getVaultInfo(LibAppStorage.Layout storage _appStorage, address token)
+internal
+view
+returns (bool exists, address vaultAddress, uint256 totalDeposits)
+{
+vaultAddress = _appStorage.s_vaults[token];
+exists = vaultAddress != address(0);
+totalDeposits = _appStorage.s_vaultDeposits[token];
+}
+
+/**
+* @notice Get user's vault token balance
+* @param user The user address
+* @param token The underlying token address
+* @return balance User's vault token balance
+*/
+function _getUserVaultBalance(LibAppStorage.Layout storage _appStorage, address user, address token)
+internal
+view
+returns (uint256 balance)
+{
+address vaultAddress = _appStorage.s_vaults[token];
+if (vaultAddress == address(0)) return 0;
+
+return IERC20(vaultAddress).balanceOf(user);
+}
+
+/**
+* @notice Get current exchange rate for a vault token
+*
+* @return exchangeRate Current exchange rate (assets per share) scaled by 1e18
+*/
+function _getVaultExchangeRate() internal pure returns (uint256 exchangeRate) {
+// Validate token is supported
+//Todo implment exchange rate
+// Events
+// event VaultDeployed(address indexed token, address indexed vault, string name, string symbol);
+return 1e18; // Placeholder, implement actual exchange rate calculation
+}
 }
