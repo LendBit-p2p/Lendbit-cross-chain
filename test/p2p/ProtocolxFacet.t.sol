@@ -43,7 +43,15 @@ contract ProtocolxFacetTest is Base {
         assertEq(request.returnDate, returnDate);
     }
 
-    function test_xServiceLendingRequest() public {
+    /**
+     * @notice Test the xServiceLendingRequest function
+     * This creates a lending request on a spoke chain
+     * and services it on the hub chain
+     *
+     * @dev This test is designed to test the xServiceLendingRequest function
+     * and the xDepositCollateral function
+     */
+    function test_xServiceLendingRequestHub() public {
         uint256 amount = 100 ether;
         _dripLink(amount, B, arbFork);
         vm.startPrank(B);
@@ -83,6 +91,135 @@ contract ProtocolxFacetTest is Base {
         assert(_request.interest == interestRate);
     }
 
+
+    /**
+     * @notice Test the xServiceLendingRequest function
+     * This creates a lending request on a hub chain
+     * and services it on a spoke chain
+     *
+     * @dev This test is designed to test the xServiceLendingRequest function
+     * and the xDepositCollateral function
+     */
+    function test_xServiceLendingRequestOnSpoke() public {
+        uint256 amount = 100 ether;
+        _dripLink(amount, B, arbFork);
+        vm.startPrank(B);
+        _xDepositCollateral(ARB_LINK_CONTRACT_ADDRESS, amount, arbFork, B);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            B,
+            LINK_CONTRACT_ADDRESS
+        );
+        assertEq(userBalance, amount);
+
+        vm.stopPrank();
+
+        uint16 interestRate = 1000;
+        uint256 duration = 30 days;
+        uint256 returnDate = block.timestamp + duration;
+        uint256 borrowAmount = 10 ether;
+
+        _xCreateLendingRequest(
+            LINK_CONTRACT_ADDRESS,
+            borrowAmount,
+            interestRate,
+            returnDate,
+            B,
+            hubFork
+        );
+
+        Request memory request = gettersFacet.getRequest(1);
+        assertEq(request.author, B);
+        assertEq(request.collateralTokens[0], LINK_CONTRACT_ADDRESS);
+        assertEq(request.amount, borrowAmount);
+        assertEq(request.interest, interestRate);
+        assertEq(request.returnDate, returnDate);
+
+        vm.selectFork(avaxFork);
+        vm.deal(owner, 1 ether);
+        _dripLink(borrowAmount, owner, avaxFork);
+        vm.startPrank(owner);
+        ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).approve(
+            address(avaxSpokeContract),
+            borrowAmount
+        );
+        avaxSpokeContract.serviceRequest{value: 1 ether}(
+            1,
+            AVAX_LINK_CONTRACT_ADDRESS,
+            borrowAmount
+        );
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+        vm.stopPrank();
+        uint256 balance = ERC20Mock(LINK_CONTRACT_ADDRESS).balanceOf(B);
+        assertEq(balance, borrowAmount);
+
+        Request memory _request = gettersFacet.getRequest(1);
+        assert(_request.lender == owner);
+        assert(_request.status == Status.SERVICED);
+        assert(_request.amount == borrowAmount);
+        assert(_request.interest == interestRate);
+    }
+
+    function test_xServiceLendingRequestSpokeToSpoke() public {
+        uint256 amount = 100 ether;
+        _dripLink(amount, B, arbFork);
+        vm.startPrank(B);
+        _xDepositCollateral(ARB_LINK_CONTRACT_ADDRESS, amount, arbFork, B);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            B,
+            LINK_CONTRACT_ADDRESS
+        );
+        assertEq(userBalance, amount);
+
+        vm.stopPrank();
+
+        uint16 interestRate = 1000;
+        uint256 duration = 30 days;
+        uint256 returnDate = block.timestamp + duration;
+        uint256 borrowAmount = 10 ether;
+
+        _xCreateLendingRequest(
+            ARB_LINK_CONTRACT_ADDRESS,
+            borrowAmount,
+            interestRate,
+            returnDate,
+            B,
+            arbFork
+        );
+
+        Request memory request = gettersFacet.getRequest(1);
+        assertEq(request.author, B);
+        assertEq(request.collateralTokens[0], LINK_CONTRACT_ADDRESS);
+        assertEq(request.amount, borrowAmount);
+        assertEq(request.interest, interestRate);
+        assertEq(request.returnDate, returnDate);
+
+        vm.selectFork(avaxFork);
+        vm.deal(owner, 1 ether);
+        _dripLink(borrowAmount, owner, avaxFork);
+        vm.startPrank(owner);
+        ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).approve(
+            address(avaxSpokeContract),
+            borrowAmount
+        );
+        avaxSpokeContract.serviceRequest{value: 1 ether}(
+            1,
+            AVAX_LINK_CONTRACT_ADDRESS,
+            borrowAmount
+        );
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+        vm.stopPrank();
+
+        Request memory _request = gettersFacet.getRequest(1);
+        assert(_request.lender == owner);
+        assert(_request.status == Status.SERVICED);
+        assert(_request.amount == borrowAmount);
+        assert(_request.interest == interestRate);
+
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+
+        uint256 balance = ERC20Mock(ARB_LINK_CONTRACT_ADDRESS).balanceOf(B);
+        assertEq(balance, borrowAmount);
+    }
     function test_xCreateLoanListing() public {
         _dripLink(100 ether, owner, arbFork);
         vm.deal(owner, 10 ether);
@@ -179,6 +316,7 @@ contract ProtocolxFacetTest is Base {
         Request memory _requestAfterRepay = gettersFacet.getRequest(1);
         assertEq(uint8(_requestAfterRepay.status), uint8(Status.CLOSED));
         assertEq(_lenderBalance, 31185000000000000000); // totalRepayment - fees
+
     }
 
     function _xCreateLendingRequest(
@@ -192,12 +330,41 @@ contract ProtocolxFacetTest is Base {
         vm.selectFork(_fork);
         vm.startPrank(_user);
         vm.deal(_user, 1 ether);
-        bytes32 messageId =
-            avaxSpokeContract.createLendingRequest{value: 1 ether}(_amount, _interestRate, _returnDate, _token);
 
-        assert(messageId != bytes32(0));
+        bytes32 messageId;
 
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+        if (_fork == hubFork) {
+            protocolFacet.createLendingRequest(
+                _amount,
+                _interestRate,
+                _returnDate,
+                _token
+            );
+        }
+
+        if (_fork == avaxFork) {
+            messageId = avaxSpokeContract.createLendingRequest{value: 1 ether}(
+                _amount,
+                _interestRate,
+                _returnDate,
+                _token
+            );
+        }
+        if (_fork == arbFork) {
+            messageId = arbSpokeContract.createLendingRequest{value: 1 ether}(
+                _amount,
+                _interestRate,
+                _returnDate,
+                _token
+            );
+        }
+
+
+        if (_fork != hubFork) {
+            assert(messageId != bytes32(0));
+
+            ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+        }
     }
 
     function _xCreateLoanListing() internal {

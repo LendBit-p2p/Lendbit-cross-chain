@@ -47,9 +47,47 @@ library LibxProtocol {
             revert Protocol__RequestExpired();
         }
 
-        _foundRequest.lender = msg.sender;
+        _foundRequest.lender = _user;
         _foundRequest.status = Status.SERVICED;
         uint256 amountToLend = _foundRequest.amount;
+
+        // Get token's decimal value and calculate the loan's USD equivalent
+        uint8 _decimalToken = LibGettersImpl._getTokenDecimal(_tokenAddress);
+        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(
+            _appStorage,
+            _tokenAddress,
+            amountToLend,
+            _decimalToken
+        );
+
+        // Calculate the total repayment amount including interest
+        uint256 _totalRepayment = Utils.calculateLoanInterest(
+            _foundRequest.returnDate,
+            _foundRequest.amount,
+            _foundRequest.interest
+        );
+        _foundRequest.totalRepayment = _totalRepayment;
+
+        // Update total loan collected in USD for the borrower
+        _appStorage
+            .addressToUser[_foundRequest.author]
+            .totalLoanCollected += LibGettersImpl._getUsdValue(
+            _appStorage,
+            _tokenAddress,
+            _totalRepayment,
+            _decimalToken
+        );
+
+        // Validate borrower's collateral health factor after loan
+        if (
+            LibGettersImpl._healthFactor(
+                _appStorage,
+                _foundRequest.author,
+                _loanUsdValue
+            ) < 1
+        ) {
+            revert Protocol__InsufficientCollateral();
+        }
 
         if (_amount < amountToLend) {
             revert Protocol__InsufficientAmount();
@@ -66,8 +104,19 @@ library LibxProtocol {
                 IERC20(_tokenAddress).safeTransfer(address(_foundRequest.author), _amount);
             }
         } else {
-            Client.EVMTokenAmount[] memory _destTokenAmounts = new Client.EVMTokenAmount[](1);
-            _destTokenAmounts[0] = Client.EVMTokenAmount({token: _tokenAddress, amount: _amount});
+
+            IERC20(_tokenAddress).approve(
+                address(Constants.CCIP_ROUTER),
+                amountToLend
+            );
+
+            Client.EVMTokenAmount[]
+                memory _destTokenAmounts = new Client.EVMTokenAmount[](1);
+            _destTokenAmounts[0] = Client.EVMTokenAmount({
+                token: _tokenAddress,
+                amount: _amount
+            });
+
             LibCCIP._sendTokenCrosschain(
                 _appStorage.s_senderSupported[_foundRequest.sourceChain],
                 _isNative,
