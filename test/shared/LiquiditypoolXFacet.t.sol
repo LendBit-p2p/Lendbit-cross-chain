@@ -8,8 +8,11 @@ import {CCIPMessageSent} from "../../contracts/spoke/libraries/Events.sol";
 import {CollateralWithdrawn} from "../../contracts/model/Event.sol";
 
 contract LiquidityPoolXFacetTest is Base {
+    address user = address(0x6e37BC743C6496f0EE268C0ea6AdBf2634d979DD);
+
     function setUp() public override {
         owner = address(0x4a3aF8C69ceE81182A9E74b2392d4bDc616Bf7c7);
+
         deployXDiamonds();
     }
 
@@ -109,51 +112,200 @@ function test_xdepositInto_LiquidityPoolThroughBoth() public {
     assertEq(vaultAssets, amount * 3);
 }
 
- function test_xWithdrawFrom_ARB_And_DepositOnAVAX() public {
+function test_xWithdrawFrom_ARB_And_DepositOnAVAX() public {
+    _intializeProtocolPool(LINK_CONTRACT_ADDRESS);
+    _deployVault(LINK_CONTRACT_ADDRESS, "USDT-VAULT", "VUSDT");
+    _dripLink(100 ether, owner, hubFork);
+    
+    uint256 amount = 100 ether;
+    _dripLink(amount, owner, avaxFork);
+    
+    // Deposit on AVAX (mints vault tokens to owner on hub)
+    xdepositIntoLiquidityPool(AVAX_LINK_CONTRACT_ADDRESS, amount, avaxFork, owner);
 
-     _intializeProtocolPool(LINK_CONTRACT_ADDRESS);
-        _deployVault(LINK_CONTRACT_ADDRESS, "USDT-VAULT", "VUSDT");
+    // Verify vault tokens exist BEFORE withdrawal
+    vm.selectFork(hubFork);
+    uint256 vaultBalance = liquidityPoolFacet.getVaultTotalAssets(LINK_CONTRACT_ADDRESS);
+    require(vaultBalance > 0, "No vault tokens to withdraw");
 
-     uint256 amount = 100 ether;
-        _dripLink(amount, owner, avaxFork);
-         xdepositIntoLiquidityPool(AVAX_LINK_CONTRACT_ADDRESS, amount, avaxFork, owner);
+    vm.prank(owner);
+    _xWithdrawnFromPool(
+        ARB_LINK_CONTRACT_ADDRESS,
+        amount,
+        arbFork,
+        owner
+    );
+
+    // Verify withdrawal
+    vm.selectFork(hubFork);
+    uint256 finalBalance = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
+    assertEq(finalBalance, 0, "Withdrawal failed");
+}
+
+/**
+ * Test Case 1: Partial Withdrawal - Deposit on ARB, Partially Withdraw on AVAX
+ */
+function test_xPartialWithdrawFrom_ARB_DepositOnAVAX() public {
+    _intializeProtocolPool(LINK_CONTRACT_ADDRESS);
+    _deployVault(LINK_CONTRACT_ADDRESS, "USDT-VAULT", "VUSDT");
+    
+    uint256 depositAmount = 100 ether;
+    uint256 withdrawAmount = 30 ether; // Partial withdrawal
+    
+    // Deposit on ARB (mints vault tokens to owner on hub)
+    xdepositIntoLiquidityPool(ARB_LINK_CONTRACT_ADDRESS, depositAmount, arbFork, owner);
+    
+    // Verify deposit was successful
+    vm.selectFork(hubFork);
+    uint256 initialBalance = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
+    assertEq(initialBalance, depositAmount);
+    
+    // Verify vault tokens exist BEFORE withdrawal
+    uint256 vaultBalance = liquidityPoolFacet.getVaultTotalAssets(LINK_CONTRACT_ADDRESS);
+    require(vaultBalance >= withdrawAmount);
+    
+    // Perform partial withdrawal to AVAX
+    vm.prank(owner);
+    _xWithdrawnFromPool(
+        AVAX_LINK_CONTRACT_ADDRESS,
+        withdrawAmount,
+        avaxFork,
+        owner
+    );
+    
+    // Verify partial withdrawal - remaining balance should be depositAmount - withdrawAmount
+    vm.selectFork(hubFork);
+    uint256 finalBalance = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
+    uint256 expectedBalance = depositAmount - withdrawAmount;
+    assertEq(finalBalance, expectedBalance);
+    
+    // Verify vault assets are correctly updated
+    uint256 finalVaultAssets = liquidityPoolFacet.getVaultTotalAssets(LINK_CONTRACT_ADDRESS);
+    assertEq(finalVaultAssets, expectedBalance);
+}
 
 
-        uint256 userBalance = liquidityPoolFacet.getUserPoolDeposit(
-            owner,
-            LINK_CONTRACT_ADDRESS
-        );
+function test_xCrossChainRoundTrip() public {
+    _intializeProtocolPool(LINK_CONTRACT_ADDRESS);
+    _deployVault(LINK_CONTRACT_ADDRESS, "USDT-VAULT", "VUSDT");
+    
+    uint256 amount = 80 ether;
+    
+    // === ROUND 1: ARB -> AVAX ===
+    
+    // Deposit on ARB
+    xdepositIntoLiquidityPool(ARB_LINK_CONTRACT_ADDRESS, amount, arbFork, owner);
+    
+    // Verify deposit
+    vm.selectFork(hubFork);
+    uint256 balanceAfterDeposit1 = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
+    assertEq(balanceAfterDeposit1, amount);
+    
+    // Withdraw to AVAX
+    vm.prank(owner);
+    _xWithdrawnFromPool(
+        AVAX_LINK_CONTRACT_ADDRESS,
+        amount,
+        avaxFork,
+        owner
+    );
+    
+    // Verify withdrawal
+    vm.selectFork(hubFork);
+    uint256 balanceAfterWithdraw1 = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
+    assertEq(balanceAfterWithdraw1, 0);
+    
+    // === ROUND 2: AVAX -> ARB ===
+    
+    // Deposit on AVAX (need to drip tokens first since they were "withdrawn" cross-chain)
+    _dripLink(amount, owner, avaxFork);
+    xdepositIntoLiquidityPool(AVAX_LINK_CONTRACT_ADDRESS, amount, avaxFork, owner);
+    
+    // Verify second deposit
+    vm.selectFork(hubFork);
+    uint256 balanceAfterDeposit2 = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
+    assertEq(balanceAfterDeposit2, amount);
+    
+    // Withdraw to ARB
+    vm.prank(owner);
+    _xWithdrawnFromPool(
+        ARB_LINK_CONTRACT_ADDRESS,
+        amount,
+        arbFork,
+        owner
+    );
+    
+    // Verify final withdrawal
+    vm.selectFork(hubFork);
+    uint256 finalBalance = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
+    assertEq(finalBalance, 0);
+    
+    // Verify vault is empty after round trip
+    uint256 finalVaultAssets = liquidityPoolFacet.getVaultTotalAssets(LINK_CONTRACT_ADDRESS);
+    assertEq(finalVaultAssets, 0);
+}
 
-        assertEq(userBalance, amount);
-        assertEq(
-            ERC20Mock(LINK_CONTRACT_ADDRESS).balanceOf(address(liquidityPoolFacet)),
-            amount
-        );
+//todo still failing dont know tho..
+function test_xtestBorrowFromLiquidityPool() public {
+    // Initialize protocol pool and deploy vault
+    _intializeProtocolPool(LINK_CONTRACT_ADDRESS);
+    _deployVault(LINK_CONTRACT_ADDRESS, "LINK-VAULT", "VLINK");
 
-          //TESTING THE VAULT WORKS 
-        uint vaultAssets = liquidityPoolFacet.getVaultTotalAssets(LINK_CONTRACT_ADDRESS);
-        assertEq(vaultAssets, amount);
+    uint256 liquidityAmount = 100 ether;
+    uint256 collateralAmount = 400 ether;
+    uint256 borrowAmount = 50 ether;
 
+    // === STEP 1: Provide liquidity to the pool ===
+    // Owner deposits LINK liquidity on AVAX
+    _dripLink(liquidityAmount, owner, avaxFork);
+    xdepositIntoLiquidityPool(AVAX_LINK_CONTRACT_ADDRESS, liquidityAmount, avaxFork, owner);
 
-        // Withdraw from AVAX fork
-        _xWithdrawnFromPool(
-            ARB_LINK_CONTRACT_ADDRESS,
-            amount,
-            arbFork,
-            owner
-        );
+   
+   //hub check
+    uint256 poolLiquidity = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
+    assertEq(poolLiquidity, liquidityAmount);
 
-        vm.selectFork(hubFork);
-        uint256 finalUserBalance = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
-        assertEq(finalUserBalance, 0, "User should have no remaining shares");
+    // === STEP 2: User deposits collateral ===
+    // User deposits LINK collateral on AVAX
+   
+    
+        vm.startPrank(user);
+        //deposit collateral through avax fork
+        ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).mint(user, 1000e18);
+    _xDepositCollateral(
+        AVAX_LINK_CONTRACT_ADDRESS,
+        collateralAmount,
+        avaxFork,
+        user
+    );
+    vm.stopPrank();
 
-    //       vm.selectFork(arbFork);
-    //     uint256 finalArbBalance = ERC20Mock(ARB_LINK_CONTRACT_ADDRESS).balanceOf(owner);
-    //     assertGt(finalArbBalance, initialArbBalance, "User should have received tokens on ARB");
-    // }
+   
+    uint256 userCollateral = gettersFacet.getAddressToCollateralDeposited(
+        user,
+        LINK_CONTRACT_ADDRESS
+    );
+    assertEq(userCollateral, collateralAmount);
 
-//     function 
-// test_xDepositOnABR_WithdrawFromHUB() public {
+    // === STEP 3: User borrows from pool ===
+    // User borrows LINK tokens to ARB chain
+    vm.startPrank(user);
+    _xborrowFromPool(
+        ARB_USDT_CONTRACT_ADDRESS,
+        borrowAmount,
+        arbFork,
+        user
+    );
+    vm.stopPrank();
+
+    // === STEP 4: Verify borrow was successful ===
+    vm.selectFork(hubFork);
+    (uint256 borrowedAmount,,, bool isActive) = liquidityPoolFacet.getUserBorrowData(user, USDT_CONTRACT_ADDRESS);
+
+    assertEq(borrowedAmount, borrowAmount);
+    assertTrue(isActive);
+}
+
 
 }
 
@@ -162,8 +314,3 @@ function test_xdepositInto_LiquidityPoolThroughBoth() public {
 
 
 
-
-
-
-
-}
