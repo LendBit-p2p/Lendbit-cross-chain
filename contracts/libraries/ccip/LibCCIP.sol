@@ -90,7 +90,13 @@ library LibCCIP {
             (uint96 _requestId, bool _isNative, address _user) = abi.decode(_messageData, (uint96, bool, address));
 
             // service the request
-            _appStorage._serviceLendingRequest(_requestId, _isNative, _user);
+            _appStorage._serviceLendingRequest(
+                _requestId,
+                _destTokenAmounts[0].token,
+                _destTokenAmounts[0].amount,
+                _isNative,
+                _user
+            );
         }
         if (_messageType == CCIPMessageType.BORROW_FROM_LISTING) {
             //decode the data
