@@ -71,22 +71,17 @@ contract SharedFacet is AppStorage {
      * - The loan must have a valid borrower.
      * @return _isLiquidated Whether the loan was successfully liquidated.
      */
-    function liquidateLoans(
+     function liquidateLoans(
         uint96 _requestId,
+        address _debtorAddress,
+        address _tokenAddress,
+        uint256 _amount,
         bool _isLP
     ) external payable returns (bool _isLiquidated) {
         if (_isLP) {
-            _appStorage._liquidateLp(
-                _requestId,
-                msg.sender,
-                Constants.CHAIN_SELECTOR
-            );
+            _appStorage._liquidateLp(msg.sender, _debtorAddress, _tokenAddress, _amount, Constants.CHAIN_SELECTOR);
         } else {
-            _appStorage._liquidateRequest(
-                _requestId,
-                msg.sender,
-                Constants.CHAIN_SELECTOR
-            );
+            _appStorage._liquidateRequest(_requestId, msg.sender, Constants.CHAIN_SELECTOR);
         }
     }
 }

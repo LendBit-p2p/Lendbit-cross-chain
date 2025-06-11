@@ -86,3 +86,27 @@ error ProtocolPool__InsufficientShares();
     error Protocol__InvalidCompoundingPeriods();
     error Protocol__ZeroLiquidity();
     error Protocol__InvalidBorrows();
+
+    //vault errors
+error UnauthorizedVault();
+error InsufficientLiquidity();
+error InsufficientShares();
+error ZeroAmount();
+error InvalidReceiver();
+error ExchangeRateDecrease();
+error VaultNotExists();
+error ProtocolPool__VaultNotDeployed();
+
+
+
+
+error Protocol__AddressZero();
+error ProtocolPool__NoDebt();
+error Protocol__LiquidationTooSmall();
+error Protocol__NoCollateralToSeize();
+error ProtocolPool__PositionStillHealthy();
+
+error ProtocolPool__NoVaultForToken();
+error ProtocolPool__NoTokensToWithdraw();
+error ProtocolPool__InsufficientVaultTokens();
+error ProtocolPool__InconsistentUserBalance();
