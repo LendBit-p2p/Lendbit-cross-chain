@@ -211,3 +211,23 @@ event CCIPMessageExecuted(
     bytes indexed sender,
     Client.EVMTokenAmount[] destTokenAmounts
 );
+
+
+event VaultDeployed(address indexed token, address indexed vault, string name, string symbol);
+event LpLiquidated(
+address indexed _debtorAddress,
+address indexed _liquidatorAddress,
+address indexed _tokenAddress,
+uint256 liquidationAmount,
+uint256 totalCollateralSeizedUsd,
+uint64 _chainSelector
+);
+// Events
+event VaultDeposited(address indexed asset, address indexed depositor, uint256 amount, uint256 shares);
+
+event VaultWithdrawn(address indexed asset, address indexed receiver, uint256 amount, uint256 shares);
+
+event VaultTransferred(address indexed asset, address indexed from, address indexed to, uint256 shares);
+
+event ExchangeRateUpdated(address indexed asset, uint256 newRate, uint256 oldRate);
+// CCIP Events
