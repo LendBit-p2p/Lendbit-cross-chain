@@ -10,10 +10,12 @@ import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.s
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Constants} from "../../utils/constants/Constant.sol";
 import {LibxShared} from "./LibxShared.sol";
+import {LibxProtocol} from "./LibxProtocol.sol";
 
 library LibCCIP {
     using LibxShared for LibAppStorage.Layout;
     using LibProtocol for LibAppStorage.Layout;
+    using LibxProtocol for LibAppStorage.Layout;
 
     function _resolveCCIPMessage(
         LibAppStorage.Layout storage _appStorage,
@@ -107,7 +109,13 @@ library LibCCIP {
             );
 
             // service the request
-            _appStorage._serviceLendingRequest(_requestId, _isNative, _user);
+            _appStorage._serviceLendingRequest(
+                _requestId,
+                _destTokenAmounts[0].token,
+                _destTokenAmounts[0].amount,
+                _isNative,
+                _user
+            );
         }
         if (_messageType == CCIPMessageType.BORROW_FROM_LISTING) {
             //decode the data
