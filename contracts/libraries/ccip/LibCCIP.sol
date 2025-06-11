@@ -11,6 +11,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Constants} from "../../utils/constants/Constant.sol";
 import {LibxShared} from "./LibxShared.sol";
 import {LibxLiquidityPool} from "./LibxLiquidityPool.sol";
+import {LibxProtocol} from "./LibxProtocol.sol";
 
 library LibCCIP {
     using LibxShared for LibAppStorage.Layout;
