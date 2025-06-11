@@ -602,6 +602,7 @@ uint256 balanceAfterRepayment = IERC20(DAI_CONTRACT_ADDRESS).balanceOf(B);
 assertEq(balanceAfterRepayment, balanceAfterBorrow - currentDebt, "Balance should be unchanged");
 assertEq(borrowedAmount, 0, "Debt should be fully cleared");
 assertFalse(isActive, "Borrow position should be inactive");
+
 }
 
 function testWithdrawFromPool() public {
