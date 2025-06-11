@@ -245,67 +245,55 @@ function test_xCrossChainRoundTrip() public {
     assertEq(finalVaultAssets, 0);
 }
 
-//todo still failing dont know tho..
 function test_xtestBorrowFromLiquidityPool() public {
+    
+    _dripLink(1000 ether, owner, arbFork);
     // Initialize protocol pool and deploy vault
     _intializeProtocolPool(LINK_CONTRACT_ADDRESS);
     _deployVault(LINK_CONTRACT_ADDRESS, "LINK-VAULT", "VLINK");
 
-    uint256 liquidityAmount = 100 ether;
-    uint256 collateralAmount = 400 ether;
-    uint256 borrowAmount = 50 ether;
+    uint256 liquidityAmount = 300 ether;
+    uint256 collateralAmount = 100 ether; // Fixed: Match actual deposit amount
+    uint256 borrowAmount = 100 ether;
+    vm.stopPrank();
 
-    // === STEP 1: Provide liquidity to the pool ===
-    // Owner deposits LINK liquidity on AVAX
-    _dripLink(liquidityAmount, owner, avaxFork);
-    xdepositIntoLiquidityPool(AVAX_LINK_CONTRACT_ADDRESS, liquidityAmount, avaxFork, owner);
+    switchSigner(owner);
 
-   
-   //hub check
+    xdepositIntoLiquidityPool(ARB_LINK_CONTRACT_ADDRESS, liquidityAmount, arbFork, owner);
+
+    // Hub check - verify liquidity was deposited
     uint256 poolLiquidity = liquidityPoolFacet.getUserPoolDeposit(owner, LINK_CONTRACT_ADDRESS);
     assertEq(poolLiquidity, liquidityAmount);
 
-    // === STEP 2: User deposits collateral ===
-    // User deposits LINK collateral on AVAX
-   
-    
-        vm.startPrank(user);
-        //deposit collateral through avax fork
-        ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).mint(user, 1000e18);
-    _xDepositCollateral(
-        AVAX_LINK_CONTRACT_ADDRESS,
-        collateralAmount,
-        avaxFork,
-        user
-    );
-    vm.stopPrank();
+    _dripLink(500 ether, B, avaxFork);
+    vm.deal(B, 10 ether);
+    switchSigner(B);
+    _xDepositCollateral(AVAX_LINK_CONTRACT_ADDRESS, collateralAmount, avaxFork, B); // Use variable
 
-   
+    // Verify collateral deposit from hub
     uint256 userCollateral = gettersFacet.getAddressToCollateralDeposited(
-        user,
+        B,
         LINK_CONTRACT_ADDRESS
     );
     assertEq(userCollateral, collateralAmount);
 
-    // === STEP 3: User borrows from pool ===
-    // User borrows LINK tokens to ARB chain
-    vm.startPrank(user);
+    vm.stopPrank();
+
+    switchSigner(B);
     _xborrowFromPool(
-        ARB_USDT_CONTRACT_ADDRESS,
+        ARB_LINK_CONTRACT_ADDRESS, 
         borrowAmount,
         arbFork,
-        user
+        B
     );
     vm.stopPrank();
 
-    // === STEP 4: Verify borrow was successful ===
     vm.selectFork(hubFork);
-    (uint256 borrowedAmount,,, bool isActive) = liquidityPoolFacet.getUserBorrowData(user, USDT_CONTRACT_ADDRESS);
+    (uint256 borrowedAmount,,, bool isActive) = liquidityPoolFacet.getUserBorrowData(B, LINK_CONTRACT_ADDRESS); // Fixed: Use B instead of user
 
     assertEq(borrowedAmount, borrowAmount);
     assertTrue(isActive);
 }
-
 
 }
 

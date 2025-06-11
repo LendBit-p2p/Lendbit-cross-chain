@@ -596,6 +596,7 @@ function _xborrowFromPool(
         ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
 
 
+
     }
 
 
@@ -739,23 +740,23 @@ function _xborrowFromPool(
         }
     }
 
-    function _dripLink(uint256 _amount, address _user, uint256 _fork) public {
-        vm.startPrank(_user);
-        if (_fork == hubFork) {
-            vm.selectFork(_fork);
-            ERC20Mock(LINK_CONTRACT_ADDRESS).mint(_user, _amount);
-        }
-        if (_fork == arbFork) {
-            vm.selectFork(_fork);
-            ERC20Mock(ARB_LINK_CONTRACT_ADDRESS).mint(_user, _amount);
-        }
-
-        if (_fork == avaxFork) {
-            vm.selectFork(_fork);
-            ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).mint(_user, _amount);
-        }
-        vm.stopPrank();
+    // Fixed _dripLink function
+function _dripLink(uint256 _amount, address _user, uint256 _fork) public {
+    vm.selectFork(_fork); // Select fork FIRST
+    vm.startPrank(_user);
+    
+    if (_fork == hubFork) {
+        ERC20Mock(LINK_CONTRACT_ADDRESS).mint(_user, _amount);
     }
+    else if (_fork == arbFork) {
+        ERC20Mock(ARB_LINK_CONTRACT_ADDRESS).mint(_user, _amount);
+    }
+    else if (_fork == avaxFork) {
+        ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).mint(_user, _amount);
+    }
+    
+    vm.stopPrank();
+}
 
     function diamondCut(
         FacetCut[] calldata _diamondCut,
