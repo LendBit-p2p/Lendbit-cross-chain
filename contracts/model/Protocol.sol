@@ -58,6 +58,7 @@ struct Request {
     address loanRequestAddr;
     address[] collateralTokens;
     Status status;
+    uint64 sourceChain;
 }
 
 /**

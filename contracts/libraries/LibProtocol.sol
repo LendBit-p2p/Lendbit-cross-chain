@@ -12,6 +12,9 @@ import "../utils/validators/Error.sol";
 import "../utils/validators/Validator.sol";
 import "../utils/constants/Constant.sol";
 import "./LibAppStorage.sol";
+import {LibCCIP} from "./ccip/LibCCIP.sol";
+import {Client} from "@chainlink/contract-ccip/contracts/libraries/Client.sol";
+import {IWERC20} from "@chainlink/contracts/src/v0.8/shared/interfaces/IWERC20.sol";
 
 library LibProtocol {
     using SafeERC20 for IERC20;
@@ -112,6 +115,7 @@ library LibProtocol {
         _newRequest.loanRequestAddr = _loanCurrency;
         _newRequest.collateralTokens = _collateralTokens;
         _newRequest.status = Status.OPEN;
+        _newRequest.sourceChain = _chainSelector;
 
         // Calculate the amount of collateral to lock based on the loan value
         uint256 collateralToLock = Utils.calculateColateralToLock(
@@ -264,19 +268,54 @@ library LibProtocol {
             ];
         }
 
-        // Transfer loan amount to borrower based on token type
-        if (_tokenAddress != Constants.NATIVE_TOKEN) {
-            IERC20(_tokenAddress).safeTransferFrom(
-                msg.sender,
-                _foundRequest.author,
-                amountToLend
-            );
-        } else {
-            (bool sent, ) = payable(_foundRequest.author).call{
-                value: amountToLend
-            }("");
+        if (_foundRequest.sourceChain == Constants.CHAIN_SELECTOR) {
+            // Transfer loan amount to borrower based on token type
+            if (_tokenAddress != Constants.NATIVE_TOKEN) {
+                IERC20(_tokenAddress).safeTransferFrom(
+                    msg.sender,
+                    _foundRequest.author,
+                    amountToLend
+                );
+            } else {
+                (bool sent, ) = payable(_foundRequest.author).call{
+                    value: amountToLend
+                }("");
 
-            if (!sent) revert Protocol__TransferFailed();
+                if (!sent) revert Protocol__TransferFailed();
+            }
+        } else {
+            if (_tokenAddress == Constants.NATIVE_TOKEN) {
+                IWERC20(Constants.WETH).deposit{value: amountToLend}();
+                IERC20(Constants.WETH).approve(
+                    address(Constants.CCIP_ROUTER),
+                    amountToLend
+                );
+            } else {
+                IERC20(_tokenAddress).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    amountToLend
+                );
+                IERC20(_tokenAddress).approve(
+                    address(Constants.CCIP_ROUTER),
+                    amountToLend
+                );
+            }
+            Client.EVMTokenAmount[]
+                memory _destTokenAmounts = new Client.EVMTokenAmount[](1);
+            _destTokenAmounts[0] = Client.EVMTokenAmount({
+                token: _tokenAddress == Constants.NATIVE_TOKEN
+                    ? Constants.WETH
+                    : _tokenAddress,
+                amount: amountToLend
+            });
+            LibCCIP._sendTokenCrosschain(
+                _appStorage.s_senderSupported[_foundRequest.sourceChain],
+                _tokenAddress == Constants.NATIVE_TOKEN,
+                _destTokenAmounts,
+                _foundRequest.sourceChain,
+                address(_foundRequest.author)
+            );
         }
 
         // Emit an event indicating successful servicing of the request
