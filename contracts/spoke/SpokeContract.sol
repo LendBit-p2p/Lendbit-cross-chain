@@ -179,7 +179,7 @@ contract SpokeContract is CCIPReceiver {
             receiver: abi.encode(i_hub),
             data: messageData,
             tokenAmounts: tokensToSendDetails,
-            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 300_000, allowOutOfOrderExecution: true})),
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 600_000, allowOutOfOrderExecution: true})),
             feeToken: address(0)
         });
 
@@ -200,7 +200,6 @@ contract SpokeContract is CCIPReceiver {
      * @param amountToRepay The amount of tokens to repay
      */
     function repay(address tokenAddress, uint256 amountToRepay) external payable {
-        //TODO: // Currently Working on the Todo
 
         if (!s_isTokenSupported[tokenAddress]) {
             revert Spoke__TokenNotSupported();
@@ -219,13 +218,13 @@ contract SpokeContract is CCIPReceiver {
         });
 
         bytes memory messageData =
-            abi.encode(CCIPMessageType.REPAY, abi.encode(tokenAddress == NATIVE_TOKEN, msg.sender));
+            abi.encode(CCIPMessageType.REPAY, abi.encode(tokenAddress == NATIVE_TOKEN,tokenAddress, msg.sender, amountToRepay));
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
             receiver: abi.encode(i_hub),
             data: messageData,
             tokenAmounts: tokensToSendDetails,
-            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 200_000, allowOutOfOrderExecution: true})),
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 600_000, allowOutOfOrderExecution: true})),
             feeToken: address(0)
         });
 
@@ -252,7 +251,7 @@ contract SpokeContract is CCIPReceiver {
         emit CCIPMessageSent(messageId, i_chainSelector, msg.sender, tokensToSendDetails);
     }
 
-    // P2P
+  
     /**
      * @notice Create a lending request
      * @param _amount The amount of tokens to lend

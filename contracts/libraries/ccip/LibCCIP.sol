@@ -67,8 +67,18 @@ library LibCCIP {
         
         if (_messageType == CCIPMessageType.REPAY) {
             //decode the data
-            (address _token, uint256 _amount) = abi.decode(_messageData, (address, uint256));
+            (bool isNative, address _token, address _user, uint256 _amount) = abi.decode(_messageData, (bool, address,address, uint256));
 
+                if (isNative) {
+                    //unwrap wrapped version of the native token
+                    IWERC20(_destTokenAmounts[0].token).withdraw(_destTokenAmounts[0].amount);
+
+                    _appStorage._repay(Constants.NATIVE_TOKEN, _destTokenAmounts[0].amount, _user, _sourceChainSelector);
+                } else {
+                    _appStorage._repay(
+                        _destTokenAmounts[0].token, _destTokenAmounts[0].amount, _user, _sourceChainSelector
+                    );
+            }
             // repay the token to the liquidity pool
         }
         // P2P

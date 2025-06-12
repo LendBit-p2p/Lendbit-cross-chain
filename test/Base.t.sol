@@ -567,10 +567,11 @@ function _xborrowFromPool(
          uint256 _fork,
          address _user
     ) public {
-
-          if (_token == ETH_CONTRACT_ADDRESS) {
+    
+        if (_token == ETH_CONTRACT_ADDRESS) {
             revert("ETH is not supported use _xDepositNativeCollateral");
         }
+
         if (_fork == hubFork) {
             liquidityPoolFacet.repay(_token, _amount);
             return;
@@ -592,10 +593,10 @@ function _xborrowFromPool(
                 _amount
             );
         }
+        vm.stopPrank();
+
         //give ccipLocalSimulatorFork the ability to route messages
         ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
-
-
 
     }
 
@@ -743,7 +744,7 @@ function _xborrowFromPool(
     // Fixed _dripLink function
 function _dripLink(uint256 _amount, address _user, uint256 _fork) public {
     vm.selectFork(_fork); // Select fork FIRST
-    vm.startPrank(_user);
+    vm.startPrank(owner);
     
     if (_fork == hubFork) {
         ERC20Mock(LINK_CONTRACT_ADDRESS).mint(_user, _amount);
