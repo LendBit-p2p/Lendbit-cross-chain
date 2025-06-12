@@ -26,7 +26,8 @@ library LibCCIP {
         uint64 _sourceChainSelector,
         Client.EVMTokenAmount[] memory _destTokenAmounts
     ) internal {
-        //handle the message based on the type
+    
+      // deposit the token to the liquidity pool
         // LP
         if (_messageType == CCIPMessageType.DEPOSIT) {
             //decode the data
@@ -42,24 +43,42 @@ library LibCCIP {
                     _destTokenAmounts[0].token, _destTokenAmounts[0].amount, _user, _sourceChainSelector
                 );
             }
-            // deposit the token to the liquidity pool
+          
         }
         if (_messageType == CCIPMessageType.WITHDRAW) {
             //decode the data
             (address _token, uint256 _amount, address _user) = abi.decode(_messageData, (address, uint256, address));
 
+
             // withdraw the token from the liquidity pool
+            _appStorage._withdraw(_token, _amount, _user, _sourceChainSelector);
+
         }
         if (_messageType == CCIPMessageType.BORROW) {
             //decode the data
-            (address _token, uint256 _amount) = abi.decode(_messageData, (address, uint256));
+            (address _token, uint256 _amount, address _user) = abi.decode(
+                _messageData,
+                (address, uint256, address)
+            );
+            _appStorage._borrowFromPool(_token, _amount, _user, _sourceChainSelector);
 
             // borrow the token from the liquidity pool
         }
+        
         if (_messageType == CCIPMessageType.REPAY) {
             //decode the data
-            (address _token, uint256 _amount) = abi.decode(_messageData, (address, uint256));
+            (bool isNative, address _token, address _user, uint256 _amount) = abi.decode(_messageData, (bool, address,address, uint256));
 
+                if (isNative) {
+                    //unwrap wrapped version of the native token
+                    IWERC20(_destTokenAmounts[0].token).withdraw(_destTokenAmounts[0].amount);
+
+                    _appStorage._repay(Constants.NATIVE_TOKEN, _destTokenAmounts[0].amount, _user, _sourceChainSelector);
+                } else {
+                    _appStorage._repay(
+                        _destTokenAmounts[0].token, _destTokenAmounts[0].amount, _user, _sourceChainSelector
+                    );
+            }
             // repay the token to the liquidity pool
         }
         // P2P

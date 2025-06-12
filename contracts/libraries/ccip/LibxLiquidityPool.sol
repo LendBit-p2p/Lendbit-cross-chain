@@ -17,6 +17,9 @@ import {LibCCIP} from "./LibCCIP.sol";
 import {ILendbitTokenVault} from "../../interfaces/ILendbitTokenVault.sol";
 import {Utils} from "../../utils/functions/Utils.sol";
 import {LibInterestAccure} from "../LibInterestAccure.sol";
+import {LibLiquidityPool} from "../LibLiquidityPool.sol";
+import {console} from "forge-std/console.sol";
+
 library LibxLiquidityPool {
     using SafeERC20 for IERC20;
 
@@ -159,6 +162,173 @@ function _withdraw(
 }
 
 /**
+ * @dev Allows users to borrow tokens from the liquidity pool
+ * @param _appStorage The app storage layout
+ * @param _token The address of the token to borrow
+ * @param _amount The amount of tokens to borrow
+ * @param _user The address of the user borrowing
+ * @param _chainSelector The chain selector for cross-chain operations
+ */
+function _borrowFromPool(
+    LibAppStorage.Layout storage _appStorage,
+    address _token,
+    uint256 _amount,
+    address _user,
+    uint64 _chainSelector
+) internal {
+    // Validation checks
+    if (!_appStorage.s_protocolPool[_token].initialize) {
+        revert ProtocolPool__NotInitialized();
+    }
+    if (_amount == 0) revert ProtocolPool__ZeroAmount();
+    if (!_appStorage.s_isLoanable[_token]) {
+        revert ProtocolPool__TokenNotSupported();
+    }
+
+    // Get storage references
+    ProtocolPool storage _protocolPool = _appStorage.s_protocolPool[_token];
+    TokenData storage tokenData = _appStorage.s_tokenData[_token];
+
+    // Liquidity validation
+    if (_protocolPool.totalSupply == 0) revert ProtocolPool__NoLiquidity();
+    if (_protocolPool.totalBorrows + _amount > _protocolPool.totalSupply) {
+        revert ProtocolPool__NotEnoughLiquidity();
+    }
+    if (!_appStorage.s_protocolPool[_token].isActive) {
+        revert ProtocolPool__IsNotActive();
+    }
+    if (tokenData.poolLiquidity < _amount) {
+        revert ProtocolPool__NotEnoughLiquidity();
+    }
+
+    // Update borrow index to accrue interest before any calculations
+    LibInterestAccure.updateBorrowIndex(tokenData, _protocolPool);
+
+    // Verify user has sufficient collateral
+    uint8 tokenDecimals = LibGettersImpl._getTokenDecimal(_token);
+    uint256 loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, _token, _amount, tokenDecimals);
+
+    // Check health factor after potential borrow
+    if (LibGettersImpl._healthFactor(_appStorage, _user, loanUsdValue) < 1e18) {
+        revert ProtocolPool__InsufficientCollateral();
+    }
+
+    // Lock collateral
+    LibLiquidityPool._lockCollateral(_appStorage, _user, _token, _amount);
+
+    // Update user borrow data
+    UserBorrowData storage userBorrowData = _appStorage.s_userBorrows[_user][_token];
+
+    // If user has an existing borrow, update it with accrued interest first
+    if (userBorrowData.isActive) {
+        uint256 currentDebt = LibLiquidityPool._calculateUserDebt(tokenData, userBorrowData);
+        userBorrowData.borrowedAmount = currentDebt + _amount;
+    } else {
+        userBorrowData.borrowedAmount = _amount;
+        userBorrowData.isActive = true;
+    }
+
+    // Update the user's borrow index to current index
+    userBorrowData.borrowIndex = tokenData.borrowIndex;
+    userBorrowData.lastUpdateTimestamp = block.timestamp;
+
+    _protocolPool.totalBorrows += _amount; 
+    tokenData.totalBorrows += _amount;
+    tokenData.poolLiquidity -= _amount;
+    tokenData.lastUpdateTimestamp = block.timestamp;
+
+    // Handle cross-chain token transfer to user
+    _handleCrossChainTransfer(_appStorage, _token, _amount, _user, _chainSelector);
+
+    // Emit borrow event
+    emit Borrow(_user, _token, _amount, _chainSelector);
+
+
+
+}
+
+/**
+* @dev Allows users to repay their borrowed tokens
+* @param _appStorage The app storage layout
+* @param _token The address of the token to repay
+* @param _amount The amount to repay, use type(uint256).max to repay full debt
+* @param _user The address of the user repaying
+* @param _chainSelector The chain selector for cross-chain operations
+* @return amountRepaid The actual amount repaid
+*/
+function _repay(
+    LibAppStorage.Layout storage _appStorage,
+    address _token,
+    uint256 _amount,
+    address _user,
+    uint64 _chainSelector
+) internal returns (uint256 amountRepaid) {
+    // Validation checks
+    if (!_appStorage.s_protocolPool[_token].initialize) {
+        revert ProtocolPool__NotInitialized();
+    }
+    if (_amount == 0) {
+        revert ProtocolPool__ZeroAmount();
+    }
+  
+    // Get storage references
+    ProtocolPool storage protocolPool = _appStorage.s_protocolPool[_token];
+    TokenData storage tokenData = _appStorage.s_tokenData[_token];
+    UserBorrowData storage userBorrowData = _appStorage.s_userBorrows[_user][_token];
+
+    if (!userBorrowData.isActive || userBorrowData.borrowedAmount == 0) {
+        revert ProtocolPool__NoBorrow();
+    }
+
+    LibInterestAccure.updateBorrowIndex(tokenData, protocolPool);
+
+    uint256 currentDebt = LibLiquidityPool._calculateUserDebt(tokenData, userBorrowData);
+    uint256 previousBorrowedAmount = userBorrowData.borrowedAmount; // Store the old borrowed amount
+  
+
+    // Determine actual repayment amount
+    if (_amount == type(uint256).max) {
+        amountRepaid = currentDebt;
+    } else {
+        amountRepaid = _amount > currentDebt ? currentDebt : _amount;
+    }
+
+    // Calculate the change in debt (this could be positive due to accrued interest)
+    uint256 debtIncrease = currentDebt > previousBorrowedAmount ? 
+        currentDebt - previousBorrowedAmount : 0;
+    
+    if (amountRepaid == currentDebt) {
+        // Full repayment
+        delete _appStorage.s_userBorrows[_user][_token];
+        LibLiquidityPool._unlockAllCollateral(_appStorage, _user);
+        
+        // Update protocol state: add any accrued interest, then subtract the full repayment
+        protocolPool.totalBorrows = protocolPool.totalBorrows + debtIncrease - currentDebt;
+        tokenData.totalBorrows = tokenData.totalBorrows + debtIncrease - currentDebt;
+        
+    } else {
+        // Partial repayment - update remaining debt
+        userBorrowData.borrowedAmount = currentDebt - amountRepaid;
+        userBorrowData.borrowIndex = tokenData.borrowIndex;
+        userBorrowData.lastUpdateTimestamp = block.timestamp;
+        
+        LibLiquidityPool._unlockCollateral(_appStorage, _user, _token, amountRepaid);
+        
+        // Update protocol state: add accrued interest, subtract repayment
+        protocolPool.totalBorrows = protocolPool.totalBorrows + debtIncrease - amountRepaid;
+        tokenData.totalBorrows = tokenData.totalBorrows + debtIncrease - amountRepaid;
+    }
+
+    // Update liquidity
+    tokenData.poolLiquidity += amountRepaid;
+    tokenData.lastUpdateTimestamp = block.timestamp;
+
+    // Emit repayment event
+    emit Repay(_user, _token, amountRepaid, _chainSelector);
+}
+
+
+/**
  * @dev Handle cross-chain token transfer
  * @param _appStorage The app storage layout
  * @param _token Token address
@@ -207,6 +377,9 @@ function _handleCrossChainTransfer(
         tokensToSendDetails
     );
 }
+
+
+
 
 
 }
