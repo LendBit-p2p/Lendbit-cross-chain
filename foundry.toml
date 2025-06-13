@@ -5,6 +5,7 @@ out = 'out'
 libs = ['lib']
 ffi = true
 verbosity = 5
+optimizer_runs = 200
 
 [rpc_endpoints]
 base_sepolia = "${BASE_SEPOLIA_RPC_URL}"

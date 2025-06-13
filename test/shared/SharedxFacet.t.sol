@@ -10,6 +10,7 @@ import {CollateralWithdrawn} from "../../contracts/model/Event.sol";
 contract SharedxFacetTest is Base {
     function setUp() public override {
         owner = address(0x4a3aF8C69ceE81182A9E74b2392d4bDc616Bf7c7);
+        B = mkaddr("B");
         deployXDiamonds();
     }
 
@@ -74,17 +75,39 @@ contract SharedxFacetTest is Base {
         assertEq(userBalance, amount * 3);
     }
 
-    // function test_xDepositCollateralNative() public {
-    //     uint256 amount = 100 ether;
-    //     vm.startPrank(owner);
-    //     _xDepositNativeCollateral(owner, amount, arbFork);
-    //     uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
-    //         owner,
-    //         ETH_CONTRACT_ADDRESS
-    //     );
+    function test_xDepositCollateralNativeARB() public {
+        uint256 amount = 100 ether;
+        vm.startPrank(owner);
+        _xDepositNativeCollateral(owner, amount, arbFork);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            ETH_CONTRACT_ADDRESS
+        );
 
-    //     assertEq(userBalance, amount);
-    // // }
+        assertEq(userBalance, amount);
+    }
+
+    function test_xWithdrawCollateralNativeARB() public {
+        uint256 amount = 100 ether;
+        vm.startPrank(owner);
+        _xDepositNativeCollateral(owner, amount, arbFork);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            ETH_CONTRACT_ADDRESS
+        );
+
+        assertEq(userBalance, amount);
+
+        vm.startPrank(owner);
+        _xWithdrawCollateral(ETH_CONTRACT_ADDRESS, amount, arbFork, owner);
+        vm.selectFork(hubFork);
+        userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            ETH_CONTRACT_ADDRESS
+        );
+        assertEq(userBalance, 0);
+    }
+
     /**
      * Testing deposit from a spoke and withdrawing from the HUB
      */
@@ -129,5 +152,11 @@ contract SharedxFacetTest is Base {
             ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).balanceOf(owner),
             amount
         );
+    }
+
+    function test_weth() public {
+        vm.startPrank(B);
+        vm.expectRevert();
+        IWERC20(WETH_CONTRACT_ADDRESS).withdraw(1 ether);
     }
 }
