@@ -160,6 +160,14 @@ library LibCCIP {
             // close the request
             _appStorage._closeRequest(_user, _requestId);
         }
+
+        if (_messageType == CCIPMessageType.CLOSE_LISTING) {
+            //decode the data
+            (uint96 _listingId, address _user) = abi.decode(_messageData, (uint96, address));
+
+            // close the request
+            _appStorage._closeListingAd(_user, _listingId);
+        }
     }
 
     function _sendTokenCrosschain(

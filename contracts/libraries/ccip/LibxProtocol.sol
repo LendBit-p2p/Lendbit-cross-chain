@@ -337,4 +337,32 @@ library LibxProtocol {
         // Emit an event to notify that the request has been closed
         emit RequestClosed(_requestId, _user, _foundRequest.sourceChain);
     }
+
+    function _closeListingAd(LibAppStorage.Layout storage _appStorage, address _user, uint96 _listingId) internal {
+        // Retrieve the loan listing associated with the given listing ID
+        LoanListing storage _listing = _appStorage.loanListings[_listingId];
+
+        // Check if the listing is OPEN; revert if it's not
+        if (_listing.listingStatus != ListingStatus.OPEN) {
+            revert Protocol__OrderNotOpen();
+        }
+
+        // Ensure that the caller is the author of the listing; revert if not
+        if (_listing.author != _user) {
+            revert Protocol__OwnerCreatedOrder();
+        }
+
+        // Ensure the amount is greater than zero; revert if it is zero
+        if (_listing.amount == 0) revert Protocol__MustBeMoreThanZero();
+
+        // Store the amount to be transferred and reset the listing amount to zero
+        uint256 _amount = _listing.amount;
+        _listing.amount = 0; // Prevent re-entrancy by setting amount to zero
+        _listing.listingStatus = ListingStatus.CLOSED; // Update listing status to CLOSED
+
+        _appStorage.s_addressToAvailableBalance[_listing.author][_listing.tokenAddress] += _amount;
+        _appStorage.s_addressToCollateralDeposited[_listing.author][_listing.tokenAddress] += _amount;
+
+        emit LoanListingClosed(_listing.listingId, _listing.author, _listing.tokenAddress, _amount);
+    }
 }

@@ -369,8 +369,31 @@ contract SpokeContract is CCIPReceiver {
      * @notice Close a listing ad
      * @param _listingId The ID of the listing
      */
-    function closeListingAd(uint96 _listingId) external {
+    function closeListingAd(uint96 _listingId) external payable returns (bytes32) {
         //TODO: // Currently Working on the Todo
+        Client.EVMTokenAmount[] memory tokensToSendDetails = new Client.EVMTokenAmount[](0);
+
+        bytes memory messageData = abi.encode(CCIPMessageType.CLOSE_LISTING, abi.encode(_listingId, msg.sender));
+
+        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(i_hub),
+            data: messageData,
+            tokenAmounts: tokensToSendDetails,
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 300_000, allowOutOfOrderExecution: true})),
+            feeToken: address(0)
+        });
+
+        uint256 fee = IRouterClient(i_ccipRouter).getFee(i_chainSelector, message);
+
+        if (msg.value < fee) {
+            revert Spoke__InsufficientFee();
+        }
+
+        bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{value: msg.value}(i_chainSelector, message);
+
+        emit CCIPMessageSent(messageId, i_chainSelector, msg.sender, tokensToSendDetails);
+
+        return messageId;
     }
 
     /**

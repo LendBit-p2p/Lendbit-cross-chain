@@ -300,6 +300,25 @@ contract ProtocolxFacetTest is Base {
         assertEq(uint8(_request.status), uint8(Status.CLOSED));
     }
 
+    function test_xCloseListing() public {
+        _xCreateLoanListing();
+        vm.selectFork(hubFork);
+        uint256 _balanceBefore = gettersFacet.getAddressToAvailableBalance(owner, LINK_CONTRACT_ADDRESS);
+
+        vm.selectFork(avaxFork);
+        vm.deal(owner, 1 ether);
+        switchSigner(owner);
+        avaxSpokeContract.closeListingAd{value: 1 ether}(1);
+
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+        LoanListing memory _listing = gettersFacet.getLoanListing(1);
+        uint256 _balanceAfter = gettersFacet.getAddressToAvailableBalance(owner, LINK_CONTRACT_ADDRESS);
+
+        assertEq(uint8(_listing.listingStatus), uint8(ListingStatus.CLOSED));
+        assertEq(_listing.amount, 0);
+        assertEq(_balanceBefore + 50 ether, _balanceAfter);
+    }
+
     function _xCreateLendingRequest(
         address _token,
         uint256 _amount,
@@ -352,5 +371,46 @@ contract ProtocolxFacetTest is Base {
         );
 
         ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+    }
+
+    function _xCreateLoanListing(
+        uint256 _amount,
+        uint256 _returnDate,
+        uint16 _interest,
+        address _loanCurrency,
+        uint256 _min_amount,
+        uint256 _max_amount,
+        address[] memory _whitelist,
+        address _user,
+        uint256 _fork
+    ) internal {
+        vm.selectFork(_fork);
+        vm.deal(_user, 10 ether);
+        vm.startPrank(_user);
+
+        bytes32 messageId;
+
+        if (_fork == hubFork) {
+            protocolFacet.createLoanListing{value: 1 ether}(
+                _amount, _min_amount, _max_amount, _returnDate, _interest, _loanCurrency, _whitelist
+            );
+        }
+
+        if (_fork == avaxFork) {
+            messageId = avaxSpokeContract.createLoanListing{value: 1 ether}(
+                _amount, _min_amount, _max_amount, _returnDate, _interest, _loanCurrency, _whitelist
+            );
+        }
+        if (_fork == arbFork) {
+            messageId = arbSpokeContract.createLoanListing{value: 1 ether}(
+                _amount, _min_amount, _max_amount, _returnDate, _interest, _loanCurrency, _whitelist
+            );
+        }
+
+        if (_fork != hubFork) {
+            assert(messageId != bytes32(0));
+
+            ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
+        }
     }
 }
