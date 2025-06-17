@@ -53,39 +53,19 @@ library LibxProtocol {
 
         // Get token's decimal value and calculate the loan's USD equivalent
         uint8 _decimalToken = LibGettersImpl._getTokenDecimal(_tokenAddress);
-        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(
-            _appStorage,
-            _tokenAddress,
-            amountToLend,
-            _decimalToken
-        );
+        uint256 _loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, _tokenAddress, amountToLend, _decimalToken);
 
         // Calculate the total repayment amount including interest
-        uint256 _totalRepayment = Utils.calculateLoanInterest(
-            _foundRequest.returnDate,
-            _foundRequest.amount,
-            _foundRequest.interest
-        );
+        uint256 _totalRepayment =
+            Utils.calculateLoanInterest(_foundRequest.returnDate, _foundRequest.amount, _foundRequest.interest);
         _foundRequest.totalRepayment = _totalRepayment;
 
         // Update total loan collected in USD for the borrower
-        _appStorage
-            .addressToUser[_foundRequest.author]
-            .totalLoanCollected += LibGettersImpl._getUsdValue(
-            _appStorage,
-            _tokenAddress,
-            _totalRepayment,
-            _decimalToken
-        );
+        _appStorage.addressToUser[_foundRequest.author].totalLoanCollected +=
+            LibGettersImpl._getUsdValue(_appStorage, _tokenAddress, _totalRepayment, _decimalToken);
 
         // Validate borrower's collateral health factor after loan
-        if (
-            LibGettersImpl._healthFactor(
-                _appStorage,
-                _foundRequest.author,
-                _loanUsdValue
-            ) < 1
-        ) {
+        if (LibGettersImpl._healthFactor(_appStorage, _foundRequest.author, _loanUsdValue) < 1) {
             revert Protocol__InsufficientCollateral();
         }
 
@@ -104,18 +84,10 @@ library LibxProtocol {
                 IERC20(_tokenAddress).safeTransfer(address(_foundRequest.author), _amount);
             }
         } else {
+            IERC20(_tokenAddress).approve(address(Constants.CCIP_ROUTER), amountToLend);
 
-            IERC20(_tokenAddress).approve(
-                address(Constants.CCIP_ROUTER),
-                amountToLend
-            );
-
-            Client.EVMTokenAmount[]
-                memory _destTokenAmounts = new Client.EVMTokenAmount[](1);
-            _destTokenAmounts[0] = Client.EVMTokenAmount({
-                token: _tokenAddress,
-                amount: _amount
-            });
+            Client.EVMTokenAmount[] memory _destTokenAmounts = new Client.EVMTokenAmount[](1);
+            _destTokenAmounts[0] = Client.EVMTokenAmount({token: _tokenAddress, amount: _amount});
 
             LibCCIP._sendTokenCrosschain(
                 _appStorage.s_senderSupported[_foundRequest.sourceChain],
@@ -345,5 +317,24 @@ library LibxProtocol {
 
         // Emit event to notify of loan repayment
         emit LoanRepayment(_user, _requestId, _amount, _chainSelector);
+    }
+
+    function _closeRequest(LibAppStorage.Layout storage _appStorage, address _user, uint96 _requestId) internal {
+        // Retrieve the lending request associated with the given request ID
+        Request storage _foundRequest = _appStorage.request[_requestId];
+
+        // Check if the request is OPEN; revert if it's not
+        if (_foundRequest.status != Status.OPEN) {
+            revert Protocol__RequestNotOpen();
+        }
+
+        // Ensure that the caller is the author of the request; revert if not
+        if (_foundRequest.author != _user) revert Protocol__NotOwner();
+
+        // Update the request status to CLOSED
+        _foundRequest.status = Status.CLOSED;
+
+        // Emit an event to notify that the request has been closed
+        emit RequestClosed(_requestId, _user, _foundRequest.sourceChain);
     }
 }
