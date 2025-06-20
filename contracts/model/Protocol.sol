@@ -33,6 +33,7 @@ struct TokenData {
     uint256 borrowIndex;
     uint256 totalReserves;
 }
+
 struct VaultConfig {
     uint256 ltvBps; // Loan-to-Value (8500 = 85%)
     uint256 liquidationThresholdBps;
@@ -140,5 +141,7 @@ enum CCIPMessageType {
     BORROW_FROM_LISTING,
     REPAY,
     REPAY_LOAN,
-    LIQUIDATE
+    LIQUIDATE,
+    CLOSE_REQUEST,
+    CLOSE_LISTING
 }
