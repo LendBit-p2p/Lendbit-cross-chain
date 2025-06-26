@@ -60,6 +60,7 @@ Arbitrum   Optimism   [More chains]
 - **Borrowers**: Create loan requests - specify how much you need and what rate you're willing to pay
 - **Complete Flexibility**: Negotiate terms that work for both parties
 - **No Middleman**: Direct agreements between users, you keep all profits
+- **Peer-to-Peer(Fixed Rate) Loans** 
 
 ### 3. Multi-Token Collateral
 **Use What You Have**
