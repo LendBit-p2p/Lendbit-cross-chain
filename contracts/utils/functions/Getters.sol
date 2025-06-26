@@ -8,7 +8,6 @@ import "../constants/Constant.sol";
 import {LibRateCalculations} from "../../libraries/LibRateCalculation.sol";
 import {LibVaultNotifications} from "../../libraries/LibVaultNotifications.sol";
 
-
 /**
  * @title Getters
  * @author LendBit Finance
@@ -16,12 +15,6 @@ import {LibVaultNotifications} from "../../libraries/LibVaultNotifications.sol";
  * Public read-only functions that allow transparency into the state of LendBit
  */
 contract Getters is AppStorage {
-
-
-
-
-    
-
     /**
      * @notice This gets the USD value of amount of the token passsed.
      *
@@ -235,7 +228,6 @@ contract Getters is AppStorage {
         _feeRate = _appStorage.feeRateBps;
     }
 
-
     /**
      * @notice Calculates the APY for a given APR and compounding periods
      * @param apr The APR in basis points
@@ -289,34 +281,30 @@ contract Getters is AppStorage {
         return (apr, apy);
     }
 
-/**
-* @notice Get vault info for a specific token
-* @param token The token address
-* @return exists Whether vault exists
-* @return vaultAddress The vault address
-* @return totalDeposits Total deposits in the vault
-*/
-function getVaultInfo(address token)
-public
-view
-returns (bool exists, address vaultAddress, uint256 totalDeposits){
-   return LibGettersImpl._getVaultInfo(_appStorage, token);
-}
-
     /**
-    * @notice Get user's vault token balance
-    * @param user The user address
-    * @param token The underlying token address
-    * @return balance User's vault token balance
-    */
-    function getUserVaultBalance(address user, address token)
-    public
-    view
-    returns (uint256 balance)
+     * @notice Get vault info for a specific token
+     * @param token The token address
+     * @return exists Whether vault exists
+     * @return vaultAddress The vault address
+     * @return totalDeposits Total deposits in the vault
+     */
+    function getVaultInfo(address token)
+        public
+        view
+        returns (bool exists, address vaultAddress, uint256 totalDeposits)
     {
-        return LibGettersImpl._getUserVaultBalance(_appStorage, user, token );
+        return LibGettersImpl._getVaultInfo(_appStorage, token);
     }
 
+    /**
+     * @notice Get user's vault token balance
+     * @param user The user address
+     * @param token The underlying token address
+     * @return balance User's vault token balance
+     */
+    function getUserVaultBalance(address user, address token) public view returns (uint256 balance) {
+        return LibGettersImpl._getUserVaultBalance(_appStorage, user, token);
+    }
 
     /* @notice Get vault's total assets
      * @param asset Token address
@@ -343,8 +331,7 @@ returns (bool exists, address vaultAddress, uint256 totalDeposits){
         LibVaultNotifications.updateVaultExchangeRate(_appStorage, asset);
     }
 
-
- /**
+    /**
      * @notice Gets the borrow data for a specific user and token
      * @param _user The address of the user
      * @param _token The address of the tok en
@@ -358,8 +345,7 @@ returns (bool exists, address vaultAddress, uint256 totalDeposits){
         view
         returns (uint256 borrowedAmount, uint256 borrowIndex, uint256 lastUpdateTimestamp, bool isActive)
     {
-       return LibGettersImpl._getUserBorrowData(_appStorage, _user, _token);
-       
+        return LibGettersImpl._getUserBorrowData(_appStorage, _user, _token);
     }
 
     /**
@@ -389,8 +375,7 @@ returns (bool exists, address vaultAddress, uint256 totalDeposits){
             bool initialize
         )
     {
-       return LibGettersImpl._getProtocolPoolConfig(_appStorage, _token);
-        
+        return LibGettersImpl._getProtocolPoolConfig(_appStorage, _token);
     }
 
     /**
@@ -399,11 +384,9 @@ returns (bool exists, address vaultAddress, uint256 totalDeposits){
      * @param token The address of the token
      * @return The maximum redeemable amount for the user
      */
-     function getUserPoolDeposit(address user, address token) public view returns (uint256) {
-       return  LibGettersImpl._getUserPoolDeposit(_appStorage, user, token);
+    function getUserPoolDeposit(address user, address token) public view returns (uint256) {
+        return LibGettersImpl._getUserPoolDeposit(_appStorage, user, token);
     }
-
-
 
     /**
      * @notice gets token data for a specific token
@@ -418,8 +401,7 @@ returns (bool exists, address vaultAddress, uint256 totalDeposits){
         view
         returns (uint256 totalSupply, uint256 poolLiquidity, uint256 totalBorrows, uint256 lastUpdateTimestamp)
     {
-         return LibGettersImpl._getPoolTokenData(_appStorage, token);
-       
+        return LibGettersImpl._getPoolTokenData(_appStorage, token);
     }
 
     /**
@@ -428,13 +410,7 @@ returns (bool exists, address vaultAddress, uint256 totalDeposits){
      * @param token The address of the token
      * @return debt The current debt amount including interest
      */
-    function getUserDebt( address user, address token) public view returns (uint256 debt) {
-       return  LibGettersImpl._getUserDebt(_appStorage, user, token);
+    function getUserDebt(address user, address token) public view returns (uint256 debt) {
+        return LibGettersImpl._getUserDebt(_appStorage, user, token);
     }
-
-
-
-
-
-
 }

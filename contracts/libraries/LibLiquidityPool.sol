@@ -480,6 +480,4 @@ library LibLiquidityPool {
             _appStorage.s_addressToLockedPoolCollateral[_user][token] = 0;
         }
     }
-
-   
 }

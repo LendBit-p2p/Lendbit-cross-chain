@@ -95,7 +95,6 @@ contract LiquidityPoolFacet is AppStorage {
         return _appStorage._withdraw(token, amount, msg.sender, Constants.CHAIN_SELECTOR);
     }
 
-
     ////////////////////
     ///VAULT ////////////
     ///////////////////

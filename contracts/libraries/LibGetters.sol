@@ -524,7 +524,7 @@ library LibGettersImpl {
      * @param token The address of the token
      * @return The maximum redeemable amount for the user
      */
-    function _getUserPoolDeposit(LibAppStorage.Layout storage _appStorage,address user,  address token)
+    function _getUserPoolDeposit(LibAppStorage.Layout storage _appStorage, address user, address token)
         internal
         view
         returns (uint256)

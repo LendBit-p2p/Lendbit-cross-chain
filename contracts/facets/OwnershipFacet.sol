@@ -250,11 +250,10 @@ contract OwnershipFacet is AppStorage, IERC173 {
      * @param symbol Vault token symbol
      * @return vaultAddress Address of the deployed vault
      */
-    function deployVault(
-        address token,
-        string memory name,
-        string memory symbol
-    ) external returns (address vaultAddress) {
+    function deployVault(address token, string memory name, string memory symbol)
+        external
+        returns (address vaultAddress)
+    {
         LibDiamond.enforceIsContractOwner();
 
         require(_appStorage.s_isLoanable[token], "Token not supported");
