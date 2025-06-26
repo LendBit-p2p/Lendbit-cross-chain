@@ -80,14 +80,13 @@ error ProtocolPool__InsufficientCollateral();
 error ProtocolPool__NoBorrow();
 error ProtocolPool__InsufficientShares();
 
+// Error definitions
+error Protocol__AprTooHigh();
+error Protocol__InvalidCompoundingPeriods();
+error Protocol__ZeroLiquidity();
+error Protocol__InvalidBorrows();
 
-  // Error definitions
-    error Protocol__AprTooHigh();
-    error Protocol__InvalidCompoundingPeriods();
-    error Protocol__ZeroLiquidity();
-    error Protocol__InvalidBorrows();
-
-    //vault errors
+//vault errors
 error UnauthorizedVault();
 error InsufficientLiquidity();
 error InsufficientShares();
@@ -96,9 +95,6 @@ error InvalidReceiver();
 error ExchangeRateDecrease();
 error VaultNotExists();
 error ProtocolPool__VaultNotDeployed();
-
-
-
 
 error Protocol__AddressZero();
 error ProtocolPool__NoDebt();

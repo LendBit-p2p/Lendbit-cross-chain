@@ -23,15 +23,9 @@ contract SharedFacet is AppStorage {
      *
      * Emits a `CollateralDeposited` event on successful deposit.
      */
-    function depositCollateral(
-        address _tokenCollateralAddress,
-        uint256 _amountOfCollateral
-    ) external payable {
+    function depositCollateral(address _tokenCollateralAddress, uint256 _amountOfCollateral) external payable {
         _appStorage._depositCollateral(
-            _tokenCollateralAddress,
-            _amountOfCollateral,
-            msg.sender,
-            Constants.CHAIN_SELECTOR
+            _tokenCollateralAddress, _amountOfCollateral, msg.sender, Constants.CHAIN_SELECTOR
         );
     }
 
@@ -47,15 +41,9 @@ contract SharedFacet is AppStorage {
      *
      * Emits a `CollateralWithdrawn` event on successful withdrawal.
      */
-    function withdrawCollateral(
-        address _tokenCollateralAddress,
-        uint256 _amountOfCollateral
-    ) external {
+    function withdrawCollateral(address _tokenCollateralAddress, uint256 _amountOfCollateral) external {
         _appStorage._withdrawCollateral(
-            _tokenCollateralAddress,
-            _amountOfCollateral,
-            msg.sender,
-            Constants.CHAIN_SELECTOR
+            _tokenCollateralAddress, _amountOfCollateral, msg.sender, Constants.CHAIN_SELECTOR
         );
     }
 
@@ -71,7 +59,7 @@ contract SharedFacet is AppStorage {
      * - The loan must have a valid borrower.
      * @return _isLiquidated Whether the loan was successfully liquidated.
      */
-     function liquidateLoans(
+    function liquidateLoans(
         uint96 _requestId,
         address _debtorAddress,
         address _tokenAddress,

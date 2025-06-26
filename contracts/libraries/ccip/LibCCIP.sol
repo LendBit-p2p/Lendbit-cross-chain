@@ -148,11 +148,22 @@ library LibCCIP {
                 );
             }
         }
+        if (_messageType == CCIPMessageType.DEPOSIT_COLLATERAL_NOT_INTERPROABLE) {
+            (address _user, address _token, uint256 _amount) = abi.decode(_messageData, (address, address, uint256));
+            _appStorage._depositCollateral(_token, _amount, _user, _sourceChainSelector);
+        }
+
         if (_messageType == CCIPMessageType.WITHDRAW_COLLATERAL) {
             //decode the data
             (address _token, uint256 _amount, address _user) = abi.decode(_messageData, (address, uint256, address));
             _appStorage._withdrawCollateral(_token, _amount, _user, _sourceChainSelector);
         }
+
+        if (_messageType == CCIPMessageType.WITHDRAW_COLLATERAL_NOT_INTERPOLABLE) {
+            (address _user, address _token, uint256 _amount) = abi.decode(_messageData, (address, address, uint256));
+            _appStorage._withdrawReleaseCollateral(_user, _token, _amount, _sourceChainSelector);
+        }
+
         if (_messageType == CCIPMessageType.CLOSE_REQUEST) {
             //decode the data
             (uint96 _requestId, address _user) = abi.decode(_messageData, (uint96, address));
@@ -170,6 +181,16 @@ library LibCCIP {
         }
     }
 
+    /**
+     * @notice Sends tokens cross-chain via CCIP with actual token transfer
+     * @dev This function physically transfers tokens from source to destination chain
+     * @param _receiver The address of the receiver contract on destination chain
+     * @param _isNative Whether the token being sent is the native token (ETH/MATIC etc.)
+     * @param _destTokenAmounts Array of tokens and amounts to send cross-chain
+     * @param _destChainSelector The CCIP chain selector for the destination chain
+     * @param _user The end user who will receive the tokens on destination chain
+     * @return messageId The CCIP message ID for tracking the cross-chain transfer
+     */
     function _sendTokenCrosschain(
         address _receiver,
         bool _isNative,
@@ -177,7 +198,7 @@ library LibCCIP {
         uint64 _destChainSelector,
         address _user
     ) internal returns (bytes32) {
-        bytes memory data = abi.encode(_isNative, _destTokenAmounts, _user);
+        bytes memory data = abi.encode(_user, _isNative, _destTokenAmounts, false);
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
             receiver: abi.encode(_receiver),
@@ -194,5 +215,46 @@ library LibCCIP {
         bytes32 messageId = IRouterClient(Constants.CCIP_ROUTER).ccipSend(_destChainSelector, message);
 
         return messageId;
+    }
+
+    /**
+     * @notice Notifies destination chain to release tokens from local storage
+     * @dev This function sends a message without transferring tokens - destination releases stored tokens
+     * @param _receiver The address of the receiver contract on destination chain
+     * @param _user The end user who will receive the released tokens
+     * @param _tokenAddressToRelease The token contract address on destination chain to release
+     * @param _tokenAmountToRelease The amount of tokens to release from destination storage
+     * @param _destChainSelector The CCIP chain selector for the destination chain
+     * @return messageId The CCIP message ID for tracking
+     * @return releaseTokenAmounts The token amounts that should be released on destination
+     */
+    function _notifyCrossChainTokenRelease(
+        address _receiver,
+        address _user,
+        address _tokenAddressToRelease,
+        uint256 _tokenAmountToRelease,
+        uint64 _destChainSelector
+    ) internal returns (bytes32, Client.EVMTokenAmount[] memory) {
+        //encode token and amount release message cross-chain
+        Client.EVMTokenAmount[] memory releaseTokenAmounts = new Client.EVMTokenAmount[](1);
+        releaseTokenAmounts[0] = Client.EVMTokenAmount({token: _tokenAddressToRelease, amount: _tokenAmountToRelease});
+
+        bytes memory data = abi.encode(_user, false, releaseTokenAmounts, true);
+
+        Client.EVMTokenAmount[] memory emptyTokenAmounts = new Client.EVMTokenAmount[](0);
+
+        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(_receiver),
+            data: data,
+            tokenAmounts: emptyTokenAmounts,
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 200_000, allowOutOfOrderExecution: true})),
+            feeToken: Constants.LINK
+        });
+
+        uint256 fee = IRouterClient(Constants.CCIP_ROUTER).getFee(_destChainSelector, message);
+        IERC20(Constants.LINK).approve(Constants.CCIP_ROUTER, fee);
+        bytes32 messageId = IRouterClient(Constants.CCIP_ROUTER).ccipSend(_destChainSelector, message);
+
+        return (messageId, releaseTokenAmounts);
     }
 }

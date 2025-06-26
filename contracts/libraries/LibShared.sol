@@ -135,6 +135,9 @@ library LibShared {
         );
     }
 
+
+
+
       // /**
     //  * @dev Allows a user to liquidate a LP.
     //  * @param _borrowIndex The index of the borrow in the LP.
@@ -166,7 +169,6 @@ library LibShared {
         // sanitity check for zero address
         _addressZeroCheck(_liquidatorAddress, _debtorAddress, _tokenAddress);
 
-        // Check if the token is supported for loaning
         if (!_appStorage.s_isLoanable[_tokenAddress]) {
             revert ProtocolPool__TokenNotSupported();
         }

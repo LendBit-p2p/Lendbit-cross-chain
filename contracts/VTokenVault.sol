@@ -79,12 +79,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param _symbol Symbol of the vault token
      * @param _diamond Diamond contract address
      */
-    constructor(
-        address _asset,
-        string memory _name,
-        string memory _symbol,
-        address _diamond
-    )
+    constructor(address _asset, string memory _name, string memory _symbol, address _diamond)
         ERC4626(IERC20(_asset))
         ERC20(_name, _symbol)
         addressZeroCheck(_asset)
@@ -109,8 +104,9 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param _newExchangeRate New exchange rate
      */
     function updateExchangeRate(uint256 _newExchangeRate) external onlyDiamond {
-        if (_newExchangeRate < exchangeRateStored)
+        if (_newExchangeRate < exchangeRateStored) {
             revert InvalidRateCanOnlyIncrease();
+        }
         exchangeRateStored = _newExchangeRate;
         lastUpdateTimestamp = block.timestamp;
         emit ExchangeRateUpdated(_newExchangeRate);
@@ -137,9 +133,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param assets Amount of assets
      * @return shares Amount of shares
      */
-    function convertToShares(
-        uint256 assets
-    ) public view override returns (uint256 shares) {
+    function convertToShares(uint256 assets) public view override returns (uint256 shares) {
         uint256 supply = totalSupply();
 
         if (supply == 0) {
@@ -155,9 +149,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param shares Amount of shares
      * @return assets Amount of assets
      */
-    function convertToAssets(
-        uint256 shares
-    ) public view override returns (uint256 assets) {
+    function convertToAssets(uint256 shares) public view override returns (uint256 assets) {
         uint256 rate = _getCurrentExchangeRate();
         return (shares * rate) / 1e18;
     }
@@ -168,10 +160,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param receiver Address receiving the shares
      * @return shares Amount of shares minted
      */
-    function deposit(
-        uint256 assets,
-        address receiver
-    )
+    function deposit(uint256 assets, address receiver)
         public
         override
         nonReentrant
@@ -192,12 +181,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
         IERC20(asset()).safeTransfer(diamond, assets);
 
         // Notify diamond about deposit
-        ILendbitProtocol(diamond).notifyVaultDeposit(
-            asset(),
-            assets,
-            receiver,
-            false
-        );
+        ILendbitProtocol(diamond).notifyVaultDeposit(asset(), assets, receiver, false);
 
         // Mint shares to receiver
         _mint(receiver, shares);
@@ -211,9 +195,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param receiver Address receiving the shares
      * @return shares Amount of shares minted
      */
-    function depositETH(
-        address receiver
-    )
+    function depositETH(address receiver)
         external
         payable
         nonReentrant
@@ -236,12 +218,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
         IERC20(Constants.WETH).safeTransfer(diamond, msg.value);
 
         // Notify diamond about deposit
-        ILendbitProtocol(diamond).notifyVaultDeposit(
-            asset(),
-            msg.value,
-            receiver,
-            false
-        );
+        ILendbitProtocol(diamond).notifyVaultDeposit(asset(), msg.value, receiver, false);
 
         // Mint shares
         _mint(receiver, shares);
@@ -257,11 +234,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param owner Owner of the shares
      * @return shares Amount of shares burned
      */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    )
+    function withdraw(uint256 assets, address receiver, address owner)
         public
         override
         nonReentrant
@@ -287,12 +260,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
         _burn(owner, shares);
 
         // Notify diamond about withdrawal - diamond will transfer assets to receiver
-        ILendbitProtocol(diamond).notifyVaultWithdrawal(
-            asset(),
-            assets,
-            receiver,
-            true
-        );
+        ILendbitProtocol(diamond).notifyVaultWithdrawal(asset(), assets, receiver, true);
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
         return shares;
@@ -305,11 +273,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param owner Owner of the shares
      * @return shares Amount of shares burned
      */
-    function withdrawETH(
-        uint256 assets,
-        address payable receiver,
-        address owner
-    )
+    function withdrawETH(uint256 assets, address payable receiver, address owner)
         external
         nonReentrant
         updateExchangeRates
@@ -336,16 +300,11 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
         _burn(owner, shares);
 
         // Notify diamond - diamond will transfer WETH back to this vault
-        ILendbitProtocol(diamond).notifyVaultWithdrawal(
-            asset(),
-            assets,
-            address(this),
-            true
-        );
+        ILendbitProtocol(diamond).notifyVaultWithdrawal(asset(), assets, address(this), true);
 
         // Unwrap WETH to ETH and send to receiver
         IWeth(Constants.WETH).withdraw(assets);
-        (bool success, ) = receiver.call{value: assets}("");
+        (bool success,) = receiver.call{value: assets}("");
         if (!success) revert ETHTransferFailed();
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
@@ -357,10 +316,12 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param receiver Address to mint shares for
      * @param shares Amount of shares to mint
      */
-    function mintFor(
-        address receiver,
-        uint256 shares
-    ) external onlyDiamond addressZeroCheck(receiver) validAmount(shares) {
+    function mintFor(address receiver, uint256 shares)
+        external
+        onlyDiamond
+        addressZeroCheck(receiver)
+        validAmount(shares)
+    {
         _mint(receiver, shares);
     }
 
@@ -369,10 +330,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param owner Address to burn shares from
      * @param shares Amount of shares to burn
      */
-    function burnFor(
-        address owner,
-        uint256 shares
-    ) external onlyDiamond addressZeroCheck(owner) validAmount(shares) {
+    function burnFor(address owner, uint256 shares) external onlyDiamond addressZeroCheck(owner) validAmount(shares) {
         if (balanceOf(owner) < shares) revert InsufficientShares();
         _burn(owner, shares);
     }
@@ -383,10 +341,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param amount Amount to transfer
      * @return success Whether transfer was successful
      */
-    function transfer(
-        address to,
-        uint256 amount
-    )
+    function transfer(address to, uint256 amount)
         public
         override(ERC20, IERC20)
         nonReentrant
@@ -398,14 +353,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
         uint256 assetAmount = convertToAssets(amount);
 
         // Notify protocol about transfer
-        if (
-            !ILendbitProtocol(diamond).notifyVaultTransfer(
-                asset(),
-                assetAmount,
-                msg.sender,
-                to
-            )
-        ) {
+        if (!ILendbitProtocol(diamond).notifyVaultTransfer(asset(), assetAmount, msg.sender, to)) {
             revert TransferNotAllowed();
         }
 
@@ -419,11 +367,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
      * @param amount Amount to transfer
      * @return success Whether transfer was successful
      */
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    )
+    function transferFrom(address from, address to, uint256 amount)
         public
         override(ERC20, IERC20)
         nonReentrant
@@ -436,14 +380,7 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
         uint256 assetAmount = convertToAssets(amount);
 
         // Notify protocol about transfer
-        if (
-            !ILendbitProtocol(diamond).notifyVaultTransfer(
-                asset(),
-                assetAmount,
-                from,
-                to
-            )
-        ) {
+        if (!ILendbitProtocol(diamond).notifyVaultTransfer(asset(), assetAmount, from, to)) {
             revert TransferNotAllowed();
         }
 
@@ -483,26 +420,11 @@ contract VTokenVault is ERC4626, ReentrancyGuard {
  * @notice Interface for Lendbit Protocol Diamond
  */
 interface ILendbitProtocol {
-    function notifyVaultDeposit(
-        address asset,
-        uint256 amount,
-        address depositor,
-        bool transferAssets
-    ) external;
-    function notifyVaultWithdrawal(
-        address asset,
-        uint256 amount,
-        address receiver,
-        bool transferAssets
-    ) external;
-    function notifyVaultTransfer(
-        address asset,
-        uint256 amount,
-        address sender,
-        address receiver
-    ) external returns (bool);
-    function getVaultExchangeRate(
-        address asset
-    ) external view returns (uint256);
+    function notifyVaultDeposit(address asset, uint256 amount, address depositor, bool transferAssets) external;
+    function notifyVaultWithdrawal(address asset, uint256 amount, address receiver, bool transferAssets) external;
+    function notifyVaultTransfer(address asset, uint256 amount, address sender, address receiver)
+        external
+        returns (bool);
+    function getVaultExchangeRate(address asset) external view returns (uint256);
     function getVaultTotalAssets(address asset) external view returns (uint256);
 }

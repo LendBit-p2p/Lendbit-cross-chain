@@ -73,6 +73,13 @@ contract Base is Test, IDiamondCut {
     address WETH_USD = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
     address ETH_USD = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
 
+
+    address AVAX_LINK_ADDRESS_ON_SPOKE  = address(2);
+    address ABR_USDT_ADDRESS_ON_SPOKE = address(3);
+    address AVAX_USDT_ADDRESS_ON_SPOKE = address(4);
+    address ABR_LINK_ADDRESS_ON_SPOKE = address(5);
+    
+
     function setUp() public virtual {
         owner = mkaddr("owner");
         B = mkaddr("B address");
@@ -319,6 +326,19 @@ contract Base is Test, IDiamondCut {
             memory arbNetworkDetails = ccipLocalSimulatorFork.getNetworkDetails(
                 block.chainid
             );
+
+
+        (ABR_USDT_ADDRESS_ON_SPOKE, USDT_USD) = deployERC20ContractAndAddPriceFeed(
+            "USDT",
+            6,
+            1
+        );
+
+        (ABR_LINK_ADDRESS_ON_SPOKE, LINK_USD) = deployERC20ContractAndAddPriceFeed(
+            "LINK",
+            18,
+            10
+        );
         arbSpokeContract = new SpokeContract(
             address(diamond),
             HUB_CHAIN_SELECTOR,
@@ -326,26 +346,49 @@ contract Base is Test, IDiamondCut {
             arbNetworkDetails.routerAddress,
             ARB_WETH_CONTRACT_ADDRESS
         );
+
         arbSpokeContract.addToken(
             ARB_USDT_CONTRACT_ADDRESS,
             USDT_CONTRACT_ADDRESS
         );
+
         arbSpokeContract.addToken(
             ARB_LINK_CONTRACT_ADDRESS,
             LINK_CONTRACT_ADDRESS
         );
+
         arbSpokeContract.addToken(
             ARB_WETH_CONTRACT_ADDRESS,
             WETH_CONTRACT_ADDRESS
         );
+
         arbSpokeContract.addToken(ETH_CONTRACT_ADDRESS, ETH_CONTRACT_ADDRESS);
+
+        arbSpokeContract.addUncrossedToken(ABR_USDT_ADDRESS_ON_SPOKE);
+        arbSpokeContract.addUncrossedToken(ABR_LINK_ADDRESS_ON_SPOKE);
+
         vm.deal(owner, 10000 ether);
         IWERC20(ARB_WETH_CONTRACT_ADDRESS).deposit{value: 10000 ether}();
+        
+
+
 
         vm.selectFork(avaxFork);
         Register.NetworkDetails
             memory avaxNetworkDetails = ccipLocalSimulatorFork
                 .getNetworkDetails(block.chainid);
+
+        (AVAX_USDT_ADDRESS_ON_SPOKE, USDT_USD) = deployERC20ContractAndAddPriceFeed(
+            "USDT",
+            6,
+            1
+        );
+
+        (AVAX_LINK_ADDRESS_ON_SPOKE, LINK_USD) = deployERC20ContractAndAddPriceFeed(
+            "USDT",
+            18,
+            1
+        );
         avaxSpokeContract = new SpokeContract(
             address(diamond),
             HUB_CHAIN_SELECTOR,
@@ -353,6 +396,7 @@ contract Base is Test, IDiamondCut {
             avaxNetworkDetails.routerAddress,
             avaxNetworkDetails.wrappedNativeAddress
         );
+
         avaxSpokeContract.addToken(
             AVAX_USDT_CONTRACT_ADDRESS,
             USDT_CONTRACT_ADDRESS
@@ -367,6 +411,16 @@ contract Base is Test, IDiamondCut {
         );
         avaxSpokeContract.addToken(ETH_CONTRACT_ADDRESS, ETH_CONTRACT_ADDRESS);
 
+        avaxSpokeContract.addUncrossedToken(
+            AVAX_USDT_ADDRESS_ON_SPOKE
+        );
+        avaxSpokeContract.addUncrossedToken(
+            AVAX_LINK_ADDRESS_ON_SPOKE
+        );
+
+      
+
+ 
         vm.selectFork(hubFork);
         ownerF.addSupportedChain(
             arbNetworkDetails.chainSelector,
@@ -381,6 +435,9 @@ contract Base is Test, IDiamondCut {
             address(diamond),
             1000000 ether
         );
+
+       
+
     }
 
     function transferTokenToOwner() public {
@@ -422,7 +479,7 @@ contract Base is Test, IDiamondCut {
         string memory name,
         string memory symbol
     ) public returns (address) {
-        return liquidityPoolFacet.deployProtocolAssetVault(token, name, symbol);
+        return  ownerF.deployVault(token, name, symbol);
     }
 
     function _intializeProtocolPool(address tokenAddress) public {
@@ -596,6 +653,7 @@ contract Base is Test, IDiamondCut {
             vm.selectFork(_fork);
             vm.deal(_user, 1 ether);
             ERC20Mock(_token).approve(address(arbSpokeContract), _amount);
+            
             arbSpokeContract.depositCollateral{value: 1 ether}(_token, _amount);
         }
 

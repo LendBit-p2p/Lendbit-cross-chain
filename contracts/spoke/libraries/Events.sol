@@ -23,3 +23,5 @@ event CCIPMessageExecuted(
     address indexed receiver,
     Client.EVMTokenAmount[] destTokenAmounts
 );
+
+event CollateralDeposited(address indexed sender, address indexed _token, uint256 indexed _amount);

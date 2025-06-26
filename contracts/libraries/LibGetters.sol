@@ -7,12 +7,11 @@ import {Constants} from "../utils/constants/Constant.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../model/Protocol.sol";
 import "../utils/validators/Error.sol";
-
+import {Utils} from "../utils/functions/Utils.sol";
 import {LibInterestRateModel} from "./LibInterestRateModel.sol";
 import {LibInterestAccure} from "./LibInterestAccure.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-
+import {LibLiquidityPool} from "./LibLiquidityPool.sol";
 
 library LibGettersImpl {
     /**
@@ -390,83 +389,207 @@ library LibGettersImpl {
     }
 
     /**
-* @notice Calculates the current debt for a specific user including accrued interest
-* @param userBorrowData The user's borrow data from storage
-* @param tokenData The token's data from storage
-* @param protocolPool The protocol pool data from storage
-* @return debt The current debt amount including interest
-*/
-function calculateUserDebt(
-UserBorrowData memory userBorrowData,
-TokenData memory tokenData,
-ProtocolPool memory protocolPool
-) internal view returns (uint256 debt) {
-if (!userBorrowData.isActive || userBorrowData.borrowedAmount == 0) {
-return 0;
-}
+     * @notice Calculates the current debt for a specific user including accrued interest
+     * @param userBorrowData The user's borrow data from storage
+     * @param tokenData The token's data from storage
+     * @param protocolPool The protocol pool data from storage
+     * @return debt The current debt amount including interest
+     */
+    function calculateUserDebt(
+        UserBorrowData memory userBorrowData,
+        TokenData memory tokenData,
+        ProtocolPool memory protocolPool
+    ) internal view returns (uint256 debt) {
+        if (!userBorrowData.isActive || userBorrowData.borrowedAmount == 0) return 0;
 
-if (block.timestamp == tokenData.lastUpdateTimestamp || tokenData.totalBorrows == 0) {
-return userBorrowData.borrowedAmount;
-}
+        if (block.timestamp == tokenData.lastUpdateTimestamp || tokenData.totalBorrows == 0) {
+            return userBorrowData.borrowedAmount;
+        }
 
-if (userBorrowData.borrowIndex == 0) {
-return userBorrowData.borrowedAmount;
-}
+        if (userBorrowData.borrowIndex == 0) return userBorrowData.borrowedAmount;
 
-uint256 timeElapsed = block.timestamp - tokenData.lastUpdateTimestamp;
-uint256 utilization = LibInterestRateModel.calculateUtilization(tokenData.totalBorrows, tokenData.poolLiquidity);
-uint256 interestRate = LibInterestRateModel.calculateInterestRate(protocolPool, utilization);
-uint256 factor = ((interestRate * timeElapsed) * 1e18) / (10000 * 31536000);
-uint256 currentBorrowIndex = tokenData.borrowIndex + ((tokenData.borrowIndex * factor) / 1e18);
-debt = (userBorrowData.borrowedAmount * currentBorrowIndex) / userBorrowData.borrowIndex;
+        uint256 timeElapsed = block.timestamp - tokenData.lastUpdateTimestamp;
+        uint256 utilization = LibInterestRateModel.calculateUtilization(tokenData.totalBorrows, tokenData.poolLiquidity);
+        uint256 interestRate = LibInterestRateModel.calculateInterestRate(protocolPool, utilization);
+        uint256 factor = ((interestRate * timeElapsed) * 1e18) / (10000 * 31536000);
+        uint256 currentBorrowIndex = tokenData.borrowIndex + ((tokenData.borrowIndex * factor) / 1e18);
+        debt = (userBorrowData.borrowedAmount * currentBorrowIndex) / userBorrowData.borrowIndex;
 
-return debt;
-}
+        return debt;
+    }
 
-/**
-* @notice Get vault info for a specific token
-* @param token The token address
-* @return exists Whether vault exists
-* @return vaultAddress The vault address
-* @return totalDeposits Total deposits in the vault
-*/
-function _getVaultInfo(LibAppStorage.Layout storage _appStorage, address token)
-internal
-view
-returns (bool exists, address vaultAddress, uint256 totalDeposits)
-{
-vaultAddress = _appStorage.s_vaults[token];
-exists = vaultAddress != address(0);
-totalDeposits = _appStorage.s_vaultDeposits[token];
-}
+    /**
+     * @notice Get vault info for a specific token
+     * @param token The token address
+     * @return exists Whether vault exists
+     * @return vaultAddress The vault address
+     * @return totalDeposits Total deposits in the vault
+     */
+    function _getVaultInfo(LibAppStorage.Layout storage _appStorage, address token)
+        internal
+        view
+        returns (bool exists, address vaultAddress, uint256 totalDeposits)
+    {
+        vaultAddress = _appStorage.s_vaults[token];
+        exists = vaultAddress != address(0);
+        totalDeposits = _appStorage.s_vaultDeposits[token];
+    }
 
-/**
-* @notice Get user's vault token balance
-* @param user The user address
-* @param token The underlying token address
-* @return balance User's vault token balance
-*/
-function _getUserVaultBalance(LibAppStorage.Layout storage _appStorage, address user, address token)
-internal
-view
-returns (uint256 balance)
-{
-address vaultAddress = _appStorage.s_vaults[token];
-if (vaultAddress == address(0)) return 0;
+    /**
+     * @notice Get user's vault token balance
+     * @param user The user address
+     * @param token The underlying token address
+     * @return balance User's vault token balance
+     */
+    function _getUserVaultBalance(LibAppStorage.Layout storage _appStorage, address user, address token)
+        internal
+        view
+        returns (uint256 balance)
+    {
+        address vaultAddress = _appStorage.s_vaults[token];
+        if (vaultAddress == address(0)) return 0;
 
-return IERC20(vaultAddress).balanceOf(user);
-}
+        return IERC20(vaultAddress).balanceOf(user);
+    }
 
-/**
-* @notice Get current exchange rate for a vault token
-*
-* @return exchangeRate Current exchange rate (assets per share) scaled by 1e18
-*/
-function _getVaultExchangeRate() internal pure returns (uint256 exchangeRate) {
-// Validate token is supported
-//Todo implment exchange rate
-// Events
-// event VaultDeployed(address indexed token, address indexed vault, string name, string symbol);
-return 1e18; // Placeholder, implement actual exchange rate calculation
-}
+    /**
+     * @notice Gets the borrow data for a specific user and token
+     * @param _user The address of the user
+     * @param _token The address of the tok en
+     * @return borrowedAmount The amount borrowed by the user
+     * @return borrowIndex The borrow index for the user
+     * @return lastUpdateTimestamp The last update timestamp for the user's borrow data
+     * @return isActive Whether the user's borrow is active
+     */
+    function _getUserBorrowData(LibAppStorage.Layout storage _appStorage, address _user, address _token)
+        internal
+        view
+        returns (uint256 borrowedAmount, uint256 borrowIndex, uint256 lastUpdateTimestamp, bool isActive)
+    {
+        borrowedAmount = LibLiquidityPool._calculateUserDebt(
+            _appStorage.s_tokenData[_token], _appStorage.s_userBorrows[_user][_token]
+        );
+
+        return (
+            borrowedAmount,
+            _appStorage.s_userBorrows[_user][_token].borrowIndex,
+            _appStorage.s_userBorrows[_user][_token].lastUpdateTimestamp,
+            _appStorage.s_userBorrows[_user][_token].isActive
+        );
+    }
+
+    /**
+     * @notice Gets the configuration of the protocol pool
+     * @return token The token address used in the pool
+     * @return totalSupply The total supply of tokens in the pool
+     * @return totalBorrows The total amount borrowed from the pool
+     * @return reserveFactor The reserve factor of the pool
+     * @return optimalUtilization The optimal utilization rate
+     * @return baseRate The base interest rate
+     * @return slopeRate The slope rate for interest calculation
+     * @return isActive Whether the pool is active
+     * @return initialize Whether the pool is initialized
+     */
+    function _getProtocolPoolConfig(LibAppStorage.Layout storage _appStorage, address _token)
+        internal
+        view
+        returns (
+            address token,
+            uint256 totalSupply,
+            uint256 totalBorrows,
+            uint256 reserveFactor,
+            uint256 optimalUtilization,
+            uint256 baseRate,
+            uint256 slopeRate,
+            bool isActive,
+            bool initialize
+        )
+    {
+        return (
+            _appStorage.s_protocolPool[_token].token,
+            _appStorage.s_protocolPool[_token].totalSupply,
+            _appStorage.s_protocolPool[_token].totalBorrows,
+            _appStorage.s_protocolPool[_token].reserveFactor,
+            _appStorage.s_protocolPool[_token].optimalUtilization,
+            _appStorage.s_protocolPool[_token].baseRate,
+            _appStorage.s_protocolPool[_token].slopeRate,
+            _appStorage.s_protocolPool[_token].isActive,
+            _appStorage.s_protocolPool[_token].initialize
+        );
+    }
+
+    /**
+     * @notice Gets the user's pool deposit amount
+     * @param user The address of the user
+     * @param token The address of the token
+     * @return The maximum redeemable amount for the user
+     */
+    function _getUserPoolDeposit(LibAppStorage.Layout storage _appStorage,address user,  address token)
+        internal
+        view
+        returns (uint256)
+    {
+        return maxRedeemable(_appStorage, user, token);
+    }
+
+    /**
+     * @notice Calculates the maximum redeemable amount for a user based on their shares
+     * @param user The address of the user
+     * @param token The address of the token
+     * @return maxRedeemableAmount The maximum redeemable amount for the user
+     */
+    function maxRedeemable(LibAppStorage.Layout storage _appStorage, address user, address token)
+        internal
+        view
+        returns (uint256)
+    {
+        // Check if the user has any shares in the pool
+        uint256 _shares = _appStorage.s_addressToUserPoolShare[user][token];
+        if (_shares == 0) return 0;
+
+        TokenData memory _token = _appStorage.s_tokenData[token];
+        // Calculate the maximum redeemable amount based on shares and pool liquidity
+        uint256 _maxRedeemableAmount = Utils.convertToAmount(_token, _shares);
+
+        return _maxRedeemableAmount;
+    }
+
+    /**
+     * @notice gets token data for a specific token
+     * @param token The address of the token
+     * @return totalSupply The total supply of the token
+     * @return poolLiquidity The total liquidity in the pool for the token
+     * @return totalBorrows The total amount borrowed from the pool for the token
+     * @return lastUpdateTimestamp The last time the token data was updated
+     */
+    function _getPoolTokenData(LibAppStorage.Layout storage _appStorage, address token)
+        internal
+        view
+        returns (uint256 totalSupply, uint256 poolLiquidity, uint256 totalBorrows, uint256 lastUpdateTimestamp)
+    {
+        return (
+            _appStorage.s_tokenData[token].totalSupply,
+            _appStorage.s_tokenData[token].poolLiquidity,
+            _appStorage.s_tokenData[token].totalBorrows,
+            _appStorage.s_tokenData[token].lastUpdateTimestamp
+        );
+    }
+
+    /**
+     * @notice Calculates the current debt for a specific user including accrued interest
+     * @param user The address of the user
+     * @param token The address of the token
+     * @return debt The current debt amount including interest
+     */
+    function _getUserDebt(LibAppStorage.Layout storage _appStorage, address user, address token)
+        internal
+        view
+        returns (uint256 debt)
+    {
+        UserBorrowData memory userBorrowData = _appStorage.s_userBorrows[user][token];
+        TokenData memory tokenData = _appStorage.s_tokenData[token];
+        ProtocolPool memory protocolPool = _appStorage.s_protocolPool[token];
+
+        debt = LibGettersImpl.calculateUserDebt(userBorrowData, tokenData, protocolPool);
+    }
 }

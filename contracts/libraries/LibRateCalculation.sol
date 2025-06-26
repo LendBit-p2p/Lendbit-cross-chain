@@ -9,9 +9,8 @@ import "../utils/validators/Error.sol";
  * @title LibRateCalculations
  * @dev Library for calculating interest rates, APR and APY for lending protocols
  */
-library LibRateCalculations {
-  
 
+library LibRateCalculations {
     /**
      * @notice Calculates the Annual Percentage Rate (APR) using direct parameters
      * @param baseRate The base interest rate in basis points
@@ -69,7 +68,6 @@ library LibRateCalculations {
         return LibInterestRateModel.calculateInterestRate(pool, utilization);
     }
 
-
     /**
      * @notice Calculates the Annual Percentage Yield (APY) from APR
      * @dev Uses compounding formula: APY = (1 + APR/n)^n - 1
@@ -102,6 +100,4 @@ library LibRateCalculations {
         // Convert back to basis points: APY = ((result - 1) * 10000)
         apy = ((result - Constants.PRECISION_SCALE) * Constants.BASIS_POINTS_SCALE) / Constants.PRECISION_SCALE;
     }
-
-   
 }
