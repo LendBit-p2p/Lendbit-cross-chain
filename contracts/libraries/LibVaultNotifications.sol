@@ -36,8 +36,9 @@ library LibVaultNotifications {
         bool transferAssets
     ) internal returns (uint256 shares) {
         // Verify caller is a valid vault
-        if (_appStorage.s_vaults[asset] != msg.sender)
+        if (_appStorage.s_vaults[asset] != msg.sender) {
             revert UnauthorizedVault();
+        }
 
         if (amount == 0) revert ZeroAmount();
         if (depositor == address(0)) revert InvalidReceiver();
@@ -54,11 +55,7 @@ library LibVaultNotifications {
                 IWeth(Constants.WETH).deposit{value: amount}();
                 asset = Constants.WETH; // Use WETH for internal accounting
             } else {
-                IERC20(asset).safeTransferFrom(
-                    msg.sender,
-                    address(this),
-                    amount
-                );
+                IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
             }
         }
 
@@ -100,8 +97,9 @@ library LibVaultNotifications {
         bool transferAssets
     ) internal returns (uint256 amount) {
         // Verify caller is a valid vault
-        if (_appStorage.s_vaults[asset] != msg.sender)
+        if (_appStorage.s_vaults[asset] != msg.sender) {
             revert UnauthorizedVault();
+        }
 
         if (shares == 0) revert ZeroAmount();
         if (receiver == address(0)) revert InvalidReceiver();
@@ -118,8 +116,9 @@ library LibVaultNotifications {
         if (tokenData.poolLiquidity < amount) revert InsufficientLiquidity();
 
         // Ensure user has enough shares
-        if (_appStorage.s_addressToUserPoolShare[receiver][asset] < shares)
+        if (_appStorage.s_addressToUserPoolShare[receiver][asset] < shares) {
             revert InsufficientShares();
+        }
 
         // Update user positions
         _appStorage.s_addressToUserPoolShare[receiver][asset] -= shares;
@@ -136,9 +135,10 @@ library LibVaultNotifications {
         if (transferAssets) {
             if (asset == Constants.NATIVE_TOKEN || asset == Constants.WETH) {
                 // Handle ETH withdrawals
-                if (asset == Constants.WETH)
+                if (asset == Constants.WETH) {
                     IWeth(Constants.WETH).withdraw(amount);
-                (bool success, ) = payable(receiver).call{value: amount}("");
+                }
+                (bool success,) = payable(receiver).call{value: amount}("");
                 require(success, "ETH transfer failed");
             } else {
                 IERC20(asset).safeTransfer(receiver, amount);
@@ -168,17 +168,20 @@ library LibVaultNotifications {
         address receiver
     ) internal returns (bool success) {
         // Verify caller is a valid vault
-        if (_appStorage.s_vaults[asset] != msg.sender)
+        if (_appStorage.s_vaults[asset] != msg.sender) {
             revert UnauthorizedVault();
+        }
 
         if (shares == 0) revert ZeroAmount();
-        if (sender == address(0) || receiver == address(0))
+        if (sender == address(0) || receiver == address(0)) {
             revert InvalidReceiver();
+        }
         if (sender == receiver) revert InvalidReceiver();
 
         // Check if sender has enough shares
-        if (_appStorage.s_addressToUserPoolShare[sender][asset] < shares)
+        if (_appStorage.s_addressToUserPoolShare[sender][asset] < shares) {
             revert InsufficientShares();
+        }
 
         // Update user positions
         _appStorage.s_addressToUserPoolShare[sender][asset] -= shares;
@@ -194,10 +197,7 @@ library LibVaultNotifications {
      * @param _appStorage The app storage layout
      * @param asset Token address
      */
-    function updateVaultExchangeRate(
-        LibAppStorage.Layout storage _appStorage,
-        address asset
-    ) internal {
+    function updateVaultExchangeRate(LibAppStorage.Layout storage _appStorage, address asset) internal {
         if (_appStorage.s_vaults[asset] == address(0)) revert VaultNotExists();
 
         _updateInterestAndExchangeRate(_appStorage, asset);
@@ -210,10 +210,11 @@ library LibVaultNotifications {
      * @param asset Token address
      * @return totalAssets Total assets for the vault
      */
-    function getVaultTotalAssets(
-        LibAppStorage.Layout storage _appStorage,
-        address asset
-    ) internal view returns (uint256 totalAssets) {
+    function getVaultTotalAssets(LibAppStorage.Layout storage _appStorage, address asset)
+        internal
+        view
+        returns (uint256 totalAssets)
+    {
         TokenData storage tokenData = _appStorage.s_tokenData[asset];
 
         // Total assets = poolLiquidity + totalBorrows (including accrued interest)
@@ -228,10 +229,11 @@ library LibVaultNotifications {
      * @param asset Token address
      * @return exchangeRate Current exchange rate (assets per share * 1e18)
      */
-    function getVaultExchangeRate(
-        LibAppStorage.Layout storage _appStorage,
-        address asset
-    ) internal view returns (uint256 exchangeRate) {
+    function getVaultExchangeRate(LibAppStorage.Layout storage _appStorage, address asset)
+        internal
+        view
+        returns (uint256 exchangeRate)
+    {
         TokenData storage tokenData = _appStorage.s_tokenData[asset];
 
         uint256 totalAssets = getVaultTotalAssets(_appStorage, asset);
@@ -250,10 +252,7 @@ library LibVaultNotifications {
      * @param _appStorage The app storage layout
      * @param asset Token address
      */
-    function _updateInterestAndExchangeRate(
-        LibAppStorage.Layout storage _appStorage,
-        address asset
-    ) internal {
+    function _updateInterestAndExchangeRate(LibAppStorage.Layout storage _appStorage, address asset) internal {
         TokenData storage tokenData = _appStorage.s_tokenData[asset];
         ProtocolPool storage protocolPool = _appStorage.s_protocolPool[asset];
 
@@ -269,10 +268,7 @@ library LibVaultNotifications {
      * @param _appStorage The app storage layout
      * @param asset Token address
      */
-    function _syncVaultExchangeRate(
-        LibAppStorage.Layout storage _appStorage,
-        address asset
-    ) internal {
+    function _syncVaultExchangeRate(LibAppStorage.Layout storage _appStorage, address asset) internal {
         address vaultAddress = _appStorage.s_vaults[asset];
         if (vaultAddress == address(0)) return;
 
@@ -282,9 +278,7 @@ library LibVaultNotifications {
         uint256 totalAssets = getVaultTotalAssets(_appStorage, asset);
         uint256 totalShares = _appStorage.s_tokenData[asset].totalSupply;
 
-        uint256 newRate = totalShares > 0
-            ? (totalAssets * 1e18) / totalShares
-            : 1e18;
+        uint256 newRate = totalShares > 0 ? (totalAssets * 1e18) / totalShares : 1e18;
 
         // Ensure exchange rate can only increase or stay the same (prevents manipulation)
         if (newRate < oldRate) revert ExchangeRateDecrease();

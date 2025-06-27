@@ -24,4 +24,5 @@ library Constants {
     uint256 constant PRECISION_SCALE = 1e18; // High precision for calculations
     uint256 constant MAX_APR_BASIS_POINTS = 1e6; // Maximum 10000% APR
     uint256 constant DEFAULT_COMPOUNDING_PERIODS = 12; // Monthly compounding
+    uint256 constant ZERO = 0;
 }

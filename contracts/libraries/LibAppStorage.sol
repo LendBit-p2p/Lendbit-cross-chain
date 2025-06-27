@@ -53,8 +53,7 @@ library LibAppStorage {
         ///@dev Liquidity PoolConfig
         address s_protocolFeeRecipient;
         bool isProtocolPoolActive;
-
-          //VAULT
+        //VAULT
         mapping(address token => address vault) s_vaults;
         mapping(address token => uint256 amount) s_vaultDeposits;
         mapping(address => VaultConfig) s_vaultConfigs;

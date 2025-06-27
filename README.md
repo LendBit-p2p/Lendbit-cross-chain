@@ -60,6 +60,7 @@ Arbitrum   Optimism   [More chains]
 - **Borrowers**: Create loan requests - specify how much you need and what rate you're willing to pay
 - **Complete Flexibility**: Negotiate terms that work for both parties
 - **No Middleman**: Direct agreements between users, you keep all profits
+- **Peer-to-Peer(Fixed Rate) Loans** 
 
 ### 3. Multi-Token Collateral
 **Use What You Have**
@@ -88,6 +89,11 @@ Arbitrum   Optimism   [More chains]
 7. **Repayment**: Send repayment from Optimism to Base hub
 8. **Loan Closed**: Hub marks loan as repaid, releases collateral
 
+### What This Means for You
+- **Gas Savings**: Use cheaper chains for transactions
+- **Flexibility**: Don't get stuck on one expensive chain
+- **Convenience**: Manage everything from anywhere
+- **Arbitrage**: Take advantage of different chain conditions
 
 ## Loan Process
 

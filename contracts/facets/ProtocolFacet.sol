@@ -39,19 +39,11 @@ contract ProtocolFacet is AppStorage {
      * collateral, calculates the total repayment including interest, and stores loan request data.
      * Emits a `RequestCreated` event on successful request creation.
      */
-    function createLendingRequest(
-        uint256 _amount,
-        uint16 _interest,
-        uint256 _returnDate,
-        address _loanCurrency
-    ) external {
+    function createLendingRequest(uint256 _amount, uint16 _interest, uint256 _returnDate, address _loanCurrency)
+        external
+    {
         _appStorage._createLendingRequest(
-            _amount,
-            _interest,
-            _returnDate,
-            _loanCurrency,
-            Constants.CHAIN_SELECTOR,
-            msg.sender
+            _amount, _interest, _returnDate, _loanCurrency, Constants.CHAIN_SELECTOR, msg.sender
         );
     }
 
@@ -68,16 +60,9 @@ contract ProtocolFacet is AppStorage {
      *
      * Emits a `RequestServiced` event upon successful funding.
      */
-    function serviceRequest(
-        uint96 _requestId,
-        address _tokenAddress
-    ) external payable {
+    function serviceRequest(uint96 _requestId, address _tokenAddress) external payable {
         // Validate the request and service it
-        _appStorage._serviceRequest(
-            _requestId,
-            _tokenAddress,
-            Constants.CHAIN_SELECTOR
-        );
+        _appStorage._serviceRequest(_requestId, _tokenAddress, Constants.CHAIN_SELECTOR);
     }
 
     /**
@@ -162,11 +147,7 @@ contract ProtocolFacet is AppStorage {
      * - `RequestServiced` when the loan request is successfully serviced.
      */
     function requestLoanFromListing(uint96 _listingId, uint256 _amount) public {
-        _appStorage._requestLoanFromListing(
-            _listingId,
-            _amount,
-            Constants.CHAIN_SELECTOR
-        );
+        _appStorage._requestLoanFromListing(_listingId, _amount, Constants.CHAIN_SELECTOR);
     }
 
     /**

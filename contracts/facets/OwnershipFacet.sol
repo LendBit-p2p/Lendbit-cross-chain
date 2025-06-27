@@ -8,6 +8,7 @@ import {ProtocolPool, TokenData, UserBorrowData} from "../model/Protocol.sol";
 import {Constants} from "../utils/constants/Constant.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {VTokenVault} from "../VTokenVault.sol";
 import "../utils/validators/Error.sol";
 import "../model/Event.sol";
 
@@ -54,10 +55,7 @@ contract OwnershipFacet is AppStorage, IERC173 {
         }
 
         // Validate parameters
-        require(
-            reserveFactor <= Constants.MAX_RESERVE_FACTOR,
-            "Reserve factor too high"
-        );
+        require(reserveFactor <= Constants.MAX_RESERVE_FACTOR, "Reserve factor too high");
         require(optimalUtilization <= 9000, "Optimal utilization too high");
         require(baseRate <= 1000, "Base rate too high");
 
@@ -117,11 +115,7 @@ contract OwnershipFacet is AppStorage, IERC173 {
      * @param _to The address to send the fees to
      * @param amount The amount of fees to withdraw
      */
-    function withdrawFees(
-        address _token,
-        address _to,
-        uint256 amount
-    ) external {
+    function withdrawFees(address _token, address _to, uint256 amount) external {
         LibDiamond.enforceIsContractOwner();
         require(_to != address(0), "invalid address");
 
@@ -129,7 +123,7 @@ contract OwnershipFacet is AppStorage, IERC173 {
         require(_feesAccrued >= amount, "insufficient fees");
         _appStorage.s_feesAccrued[_token] = _feesAccrued - amount;
         if (_token == Constants.NATIVE_TOKEN) {
-            (bool sent, ) = payable(_to).call{value: amount}("");
+            (bool sent,) = payable(_to).call{value: amount}("");
             require(sent, "failed to send Ether");
         } else {
             IERC20(_token).safeTransfer(_to, amount);
@@ -148,10 +142,7 @@ contract OwnershipFacet is AppStorage, IERC173 {
      *
      * Emits an `UpdatedCollateralTokens` event with the total number of collateral tokens added.
      */
-    function addCollateralTokens(
-        address[] memory _tokens,
-        address[] memory _priceFeeds
-    ) external {
+    function addCollateralTokens(address[] memory _tokens, address[] memory _priceFeeds) external {
         // Ensure only the contract owner can add collateral tokens
         LibDiamond.enforceIsContractOwner();
 
@@ -167,10 +158,7 @@ contract OwnershipFacet is AppStorage, IERC173 {
         }
 
         // Emit an event indicating the updated number of collateral tokens
-        emit UpdatedCollateralTokens(
-            msg.sender,
-            uint8(_appStorage.s_collateralToken.length)
-        );
+        emit UpdatedCollateralTokens(msg.sender, uint8(_appStorage.s_collateralToken.length));
     }
 
     /**
@@ -194,10 +182,8 @@ contract OwnershipFacet is AppStorage, IERC173 {
             for (uint8 j = 0; j < _appStorage.s_collateralToken.length; j++) {
                 if (_appStorage.s_collateralToken[j] == _tokens[i]) {
                     // Replace the token to be removed with the last token in the array
-                    _appStorage.s_collateralToken[j] = _appStorage
-                        .s_collateralToken[
-                            _appStorage.s_collateralToken.length - 1
-                        ];
+                    _appStorage.s_collateralToken[j] =
+                        _appStorage.s_collateralToken[_appStorage.s_collateralToken.length - 1];
 
                     // Remove the last token from the array
                     _appStorage.s_collateralToken.pop();
@@ -207,10 +193,7 @@ contract OwnershipFacet is AppStorage, IERC173 {
         }
 
         // Emit an event indicating the updated count of collateral tokens
-        emit UpdatedCollateralTokens(
-            msg.sender,
-            uint8(_appStorage.s_collateralToken.length)
-        );
+        emit UpdatedCollateralTokens(msg.sender, uint8(_appStorage.s_collateralToken.length));
     }
 
     /**
@@ -245,10 +228,7 @@ contract OwnershipFacet is AppStorage, IERC173 {
      * @param _chainSelector The chain selector to add.
      * @param _sender The sender address to add.
      */
-    function addSupportedChain(
-        uint64 _chainSelector,
-        address _sender
-    ) external {
+    function addSupportedChain(uint64 _chainSelector, address _sender) external {
         LibDiamond.enforceIsContractOwner();
         _appStorage.s_chainSelectorSupported[_chainSelector] = true;
         _appStorage.s_senderSupported[_chainSelector] = _sender;
@@ -259,8 +239,35 @@ contract OwnershipFacet is AppStorage, IERC173 {
      * @param _chainSelector The chain selector to remove.
      */
     function removeSupportedChain(uint64 _chainSelector) external {
-        LibDiamond.enforceIsContractOwner();
         _appStorage.s_chainSelectorSupported[_chainSelector] = false;
         _appStorage.s_senderSupported[_chainSelector] = address(0);
+    }
+
+    /**
+     * @notice Deploy a new VToken vault for a supported token
+     * @param token Token address
+     * @param name Vault token name
+     * @param symbol Vault token symbol
+     * @return vaultAddress Address of the deployed vault
+     */
+    function deployVault(address token, string memory name, string memory symbol)
+        external
+        returns (address vaultAddress)
+    {
+        LibDiamond.enforceIsContractOwner();
+
+        require(_appStorage.s_isLoanable[token], "Token not supported");
+        require(_appStorage.s_vaults[token] == address(0), "Vault already deployed");
+
+        // Deploy new vault
+        VTokenVault vault = new VTokenVault(token, name, symbol, address(this));
+
+        // Store vault address
+        _appStorage.s_vaults[token] = address(vault);
+        _appStorage.s_vaultDeposits[token] = 0;
+
+        emit VaultDeployed(token, address(vault), name, symbol);
+
+        return address(vault);
     }
 }

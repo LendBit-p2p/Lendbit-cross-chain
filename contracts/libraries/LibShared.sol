@@ -31,14 +31,8 @@ library LibShared {
     ) internal {
         // Validate the input parameters: `_amountOfCollateral` must be greater than zero,
         // and `_tokenCollateralAddress` must have a valid price feed (non-zero address).
-        Validator._valueMoreThanZero(
-            _amountOfCollateral,
-            _tokenCollateralAddress,
-            msg.value
-        );
-        Validator._isTokenAllowed(
-            _appStorage.s_priceFeeds[_tokenCollateralAddress]
-        );
+        Validator._valueMoreThanZero(_amountOfCollateral, _tokenCollateralAddress, msg.value);
+        Validator._isTokenAllowed(_appStorage.s_priceFeeds[_tokenCollateralAddress]);
 
         // Determine if the collateral is the native token
         bool _isNativeToken = _tokenCollateralAddress == Constants.NATIVE_TOKEN;
@@ -49,30 +43,16 @@ library LibShared {
         }
         // Transfer ERC-20 tokens from the sender to the contract if not the native token
         if (!_isNativeToken) {
-            IERC20(_tokenCollateralAddress).safeTransferFrom(
-                _user,
-                address(this),
-                _amountOfCollateral
-            );
+            IERC20(_tokenCollateralAddress).safeTransferFrom(_user, address(this), _amountOfCollateral);
         }
 
         // Update the user's collateral and available balance in storage
-        _appStorage.s_addressToCollateralDeposited[_user][
-            _tokenCollateralAddress
-        ] += _amountOfCollateral;
-        _appStorage.s_addressToAvailableBalance[_user][
-            _tokenCollateralAddress
-        ] += _amountOfCollateral;
+        _appStorage.s_addressToCollateralDeposited[_user][_tokenCollateralAddress] += _amountOfCollateral;
+        _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress] += _amountOfCollateral;
 
         // Emit an event for the collateral deposit
-        emit CollateralDeposited(
-            _user,
-            _tokenCollateralAddress,
-            _amountOfCollateral,
-            _chainSelector
-        );
+        emit CollateralDeposited(_user, _tokenCollateralAddress, _amountOfCollateral, _chainSelector);
     }
-
 
     function _addressZeroCheck(address _user, address _debtorAddress, address _tokenAddress) internal pure {
         if (_user == address(0) || _debtorAddress == address(0) || _tokenAddress == address(0)) {
@@ -85,6 +65,7 @@ library LibShared {
      * @param _amount The amount of collateral to withdraw.
      * @param _user The address of the user withdrawing the collateral.
      */
+
     function _withdrawCollateral(
         LibAppStorage.Layout storage _appStorage,
         address _tokenCollateralAddress,
@@ -93,15 +74,11 @@ library LibShared {
         uint64 _chainSelector
     ) internal {
         // Validate that the token is allowed and the amount is greater than zero
-        Validator._isTokenAllowed(
-            _appStorage.s_priceFeeds[_tokenCollateralAddress]
-        );
+        Validator._isTokenAllowed(_appStorage.s_priceFeeds[_tokenCollateralAddress]);
         Validator._moreThanZero(_amount);
 
         // Retrieve the user's deposited amount for the specified token
-        uint256 depositedAmount = _appStorage.s_addressToAvailableBalance[
-            _user
-        ][_tokenCollateralAddress];
+        uint256 depositedAmount = _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress];
 
         // Check if the user has sufficient collateral to withdraw the requested amount
         if (depositedAmount < _amount) {
@@ -109,17 +86,13 @@ library LibShared {
         }
 
         // Update storage to reflect the withdrawal of collateral
-        _appStorage.s_addressToCollateralDeposited[_user][
-            _tokenCollateralAddress
-        ] -= _amount;
-        _appStorage.s_addressToAvailableBalance[_user][
-            _tokenCollateralAddress
-        ] -= _amount;
+        _appStorage.s_addressToCollateralDeposited[_user][_tokenCollateralAddress] -= _amount;
+        _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress] -= _amount;
 
         // Handle withdrawal for native token vs ERC20 tokens
         if (_tokenCollateralAddress == Constants.NATIVE_TOKEN) {
             // Transfer native token to the user
-            (bool sent, ) = payable(_user).call{value: _amount}("");
+            (bool sent,) = payable(_user).call{value: _amount}("");
             if (!sent) revert Protocol__TransferFailed();
         } else {
             // Transfer ERC20 token to the user
@@ -127,15 +100,10 @@ library LibShared {
         }
 
         // Emit an event indicating successful collateral withdrawal
-        emit CollateralWithdrawn(
-            _user,
-            _tokenCollateralAddress,
-            _amount,
-            _chainSelector
-        );
+        emit CollateralWithdrawn(_user, _tokenCollateralAddress, _amount, _chainSelector);
     }
 
-      // /**
+    // /**
     //  * @dev Allows a user to liquidate a LP.
     //  * @param _borrowIndex The index of the borrow in the LP.
     //  * @param _user The address of the user liquidating the collateral.
@@ -166,7 +134,6 @@ library LibShared {
         // sanitity check for zero address
         _addressZeroCheck(_liquidatorAddress, _debtorAddress, _tokenAddress);
 
-        // Check if the token is supported for loaning
         if (!_appStorage.s_isLoanable[_tokenAddress]) {
             revert ProtocolPool__TokenNotSupported();
         }
@@ -422,31 +389,18 @@ library LibShared {
 
         // Calculate loan value in USD
         uint8 loanTokenDecimal = LibGettersImpl._getTokenDecimal(loanToken);
-        uint256 loanUsdValue = LibGettersImpl._getUsdValue(
-            _appStorage,
-            loanToken,
-            totalDebt,
-            loanTokenDecimal
-        );
+        uint256 loanUsdValue = LibGettersImpl._getUsdValue(_appStorage, loanToken, totalDebt, loanTokenDecimal);
 
         // Calculate total value of collateral in USD
         uint256 totalCollateralValue = 0;
         for (uint256 i = 0; i < request.collateralTokens.length; i++) {
             address collateralToken = request.collateralTokens[i];
-            uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[
-                _requestId
-            ][collateralToken];
+            uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[_requestId][collateralToken];
 
             if (collateralAmount > 0) {
-                uint8 collateralDecimal = LibGettersImpl._getTokenDecimal(
-                    collateralToken
-                );
-                totalCollateralValue += LibGettersImpl._getUsdValue(
-                    _appStorage,
-                    collateralToken,
-                    collateralAmount,
-                    collateralDecimal
-                );
+                uint8 collateralDecimal = LibGettersImpl._getTokenDecimal(collateralToken);
+                totalCollateralValue +=
+                    LibGettersImpl._getUsdValue(_appStorage, collateralToken, collateralAmount, collateralDecimal);
             }
         }
 
@@ -468,12 +422,12 @@ library LibShared {
             // Refund excess ETH to liquidator
             uint256 excess = msg.value - totalDebt;
             if (excess > 0) {
-                (bool refundSent, ) = payable(_user).call{value: excess}("");
+                (bool refundSent,) = payable(_user).call{value: excess}("");
                 if (!refundSent) revert Protocol__RefundFailed();
             }
 
             // Transfer the debt amount to the lender
-            (bool lenderSent, ) = payable(lender).call{value: totalDebt}("");
+            (bool lenderSent,) = payable(lender).call{value: totalDebt}("");
             if (!lenderSent) revert Protocol__ETHTransferFailed();
         } else {
             // For ERC20 tokens, transfer from liquidator to lender
@@ -483,51 +437,33 @@ library LibShared {
         // Process each collateral token and transfer to liquidator with discount
         for (uint256 i = 0; i < request.collateralTokens.length; i++) {
             address collateralToken = request.collateralTokens[i];
-            uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[
-                _requestId
-            ][collateralToken];
+            uint256 collateralAmount = _appStorage.s_idToCollateralTokenAmount[_requestId][collateralToken];
 
             if (collateralAmount > 0) {
                 // Calculate discounted amount (apply liquidation discount)
-                uint256 discountedAmount = (collateralAmount *
-                    (10000 - Constants.LIQUIDATION_DISCOUNT)) / 10000;
+                uint256 discountedAmount = (collateralAmount * (10000 - Constants.LIQUIDATION_DISCOUNT)) / 10000;
 
                 // Transfer discounted amount to liquidator
                 if (collateralToken == Constants.NATIVE_TOKEN) {
-                    (bool sent, ) = payable(_user).call{
-                        value: discountedAmount
-                    }("");
+                    (bool sent,) = payable(_user).call{value: discountedAmount}("");
                     if (!sent) revert Protocol__ETHTransferFailed();
                 } else {
-                    IERC20(collateralToken).safeTransfer(
-                        _user,
-                        discountedAmount
-                    );
+                    IERC20(collateralToken).safeTransfer(_user, discountedAmount);
                 }
 
                 // The difference between original collateral and discounted amount goes to protocol as fee
                 uint256 protocolAmount = collateralAmount - discountedAmount;
-                if (
-                    protocolAmount > 0 &&
-                    _appStorage.s_protocolFeeRecipient != address(0)
-                ) {
+                if (protocolAmount > 0 && _appStorage.s_protocolFeeRecipient != address(0)) {
                     if (collateralToken == Constants.NATIVE_TOKEN) {
-                        (bool sent, ) = payable(
-                            _appStorage.s_protocolFeeRecipient
-                        ).call{value: protocolAmount}("");
+                        (bool sent,) = payable(_appStorage.s_protocolFeeRecipient).call{value: protocolAmount}("");
                         if (!sent) revert Protocol__ETHFeeTransferFailed();
                     } else {
-                        IERC20(collateralToken).safeTransfer(
-                            _appStorage.s_protocolFeeRecipient,
-                            protocolAmount
-                        );
+                        IERC20(collateralToken).safeTransfer(_appStorage.s_protocolFeeRecipient, protocolAmount);
                     }
                 }
 
                 // Reset collateral tracking to prevent double-spending
-                _appStorage.s_idToCollateralTokenAmount[_requestId][
-                    collateralToken
-                ] = 0;
+                _appStorage.s_idToCollateralTokenAmount[_requestId][collateralToken] = 0;
             }
         }
 
@@ -536,11 +472,6 @@ library LibShared {
         liquidator.totalLiquidationAmount += totalCollateralValue;
 
         // Emit event for off-chain tracking and transparency
-        emit RequestLiquidated(
-            _requestId,
-            _user,
-            totalCollateralValue,
-            _chainSelector
-        );
+        emit RequestLiquidated(_requestId, _user, totalCollateralValue, _chainSelector);
     }
 }

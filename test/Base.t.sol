@@ -50,28 +50,27 @@ contract Base is Test, IDiamondCut {
     address[] _spokeTokens;
     address[] _priceFeed;
 
-    address WETH_CONTRACT_ADDRESS =
-        address(0xbAd49269309C439e811E2315B343c4b54CdBEd07);
+    address WETH_CONTRACT_ADDRESS = address(0xbAd49269309C439e811E2315B343c4b54CdBEd07);
     address USDT_CONTRACT_ADDRESS = address(2);
     address DAI_CONTRACT_ADDRESS = address(3);
     address LINK_CONTRACT_ADDRESS = address(4);
     address ETH_CONTRACT_ADDRESS = address(1);
-    address ARB_LINK_CONTRACT_ADDRESS =
-        address(0x23eb68D3C0472f6892c2d68B0F2A8F0f5282a7ED);
-    address ARB_USDT_CONTRACT_ADDRESS =
-        address(0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d);
-    address ARB_WETH_CONTRACT_ADDRESS =
-        address(0x5cB4bfA9f8803Ae9231b6eAC4AC85e1dAd8bC432);
-    address AVAX_LINK_CONTRACT_ADDRESS =
-        address(0xdEd13e60DF60b5C1CA192160487D7B5ef82769A4);
-    address AVAX_USDT_CONTRACT_ADDRESS =
-        address(0x5425890298aed601595a70AB815c96711a31Bc65);
+    address ARB_LINK_CONTRACT_ADDRESS = address(0x23eb68D3C0472f6892c2d68B0F2A8F0f5282a7ED);
+    address ARB_USDT_CONTRACT_ADDRESS = address(0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d);
+    address ARB_WETH_CONTRACT_ADDRESS = address(0x5cB4bfA9f8803Ae9231b6eAC4AC85e1dAd8bC432);
+    address AVAX_LINK_CONTRACT_ADDRESS = address(0xdEd13e60DF60b5C1CA192160487D7B5ef82769A4);
+    address AVAX_USDT_CONTRACT_ADDRESS = address(0x5425890298aed601595a70AB815c96711a31Bc65);
 
     address USDT_USD = 0x3ec8593F930EA45ea58c968260e6e9FF53FC934f;
     address DAI_USD = 0xD1092a65338d049DB68D7Be6bD89d17a0929945e;
     address LINK_USD = 0xb113F5A928BCfF189C998ab20d753a47F9dE5A61;
     address WETH_USD = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
     address ETH_USD = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
+
+    address AVAX_LINK_ADDRESS_ON_SPOKE = address(2);
+    address ABR_USDT_ADDRESS_ON_SPOKE = address(3);
+    address AVAX_USDT_ADDRESS_ON_SPOKE = address(4);
+    address ABR_LINK_ADDRESS_ON_SPOKE = address(5);
 
     function setUp() public virtual {
         owner = mkaddr("owner");
@@ -94,26 +93,10 @@ contract Base is Test, IDiamondCut {
         liquidityPoolFacet = new LiquidityPoolFacet();
         ccipFacet = new CcipFacet();
 
-        (USDT_CONTRACT_ADDRESS, USDT_USD) = deployERC20ContractAndAddPriceFeed(
-            "USDT",
-            6,
-            1
-        );
-        (DAI_CONTRACT_ADDRESS, DAI_USD) = deployERC20ContractAndAddPriceFeed(
-            "DAI",
-            18,
-            1
-        );
-        (LINK_CONTRACT_ADDRESS, LINK_USD) = deployERC20ContractAndAddPriceFeed(
-            "LINK",
-            18,
-            10
-        );
-        (WETH_CONTRACT_ADDRESS, WETH_USD) = deployERC20ContractAndAddPriceFeed(
-            "WETH",
-            18,
-            2000
-        );
+        (USDT_CONTRACT_ADDRESS, USDT_USD) = deployERC20ContractAndAddPriceFeed("USDT", 6, 1);
+        (DAI_CONTRACT_ADDRESS, DAI_USD) = deployERC20ContractAndAddPriceFeed("DAI", 18, 1);
+        (LINK_CONTRACT_ADDRESS, LINK_USD) = deployERC20ContractAndAddPriceFeed("LINK", 18, 10);
+        (WETH_CONTRACT_ADDRESS, WETH_USD) = deployERC20ContractAndAddPriceFeed("WETH", 18, 2000);
 
         _hubTokens.push(USDT_CONTRACT_ADDRESS);
         _hubTokens.push(DAI_CONTRACT_ADDRESS);
@@ -200,9 +183,7 @@ contract Base is Test, IDiamondCut {
 
     function deployXDiamonds() public virtual {
         string memory HUB_RPC_URL = vm.envString("BASE_SEPOLIA_RPC_URL");
-        string memory SPOKE_ARB_RPC_URL = vm.envString(
-            "ARBITRUM_SEPOLIA_RPC_URL"
-        );
+        string memory SPOKE_ARB_RPC_URL = vm.envString("ARBITRUM_SEPOLIA_RPC_URL");
         string memory SPOKE_AVAX_RPC_URL = vm.envString("AVAX_SEPOLIA_RPC_URL");
 
         hubFork = vm.createFork(HUB_RPC_URL);
@@ -226,12 +207,8 @@ contract Base is Test, IDiamondCut {
         liquidityPoolFacet = new LiquidityPoolFacet();
         ccipFacet = new CcipFacet();
 
-        LINK_CONTRACT_ADDRESS = address(
-            0x46d4AafcEd9cc65089D1606e6cAE85fe6D7df456
-        );
-        USDT_CONTRACT_ADDRESS = address(
-            0x036CbD53842c5426634e7929541eC2318f3dCF7e
-        ); //Here we are using a USDC address instead of USDT.
+        LINK_CONTRACT_ADDRESS = address(0x46d4AafcEd9cc65089D1606e6cAE85fe6D7df456);
+        USDT_CONTRACT_ADDRESS = address(0x036CbD53842c5426634e7929541eC2318f3dCF7e); //Here we are using a USDC address instead of USDT.
 
         _hubTokens.push(USDT_CONTRACT_ADDRESS);
         _hubTokens.push(LINK_CONTRACT_ADDRESS);
@@ -315,10 +292,11 @@ contract Base is Test, IDiamondCut {
         IWERC20(WETH_CONTRACT_ADDRESS).deposit{value: 10000 ether}();
 
         vm.selectFork(arbFork);
-        Register.NetworkDetails
-            memory arbNetworkDetails = ccipLocalSimulatorFork.getNetworkDetails(
-                block.chainid
-            );
+        Register.NetworkDetails memory arbNetworkDetails = ccipLocalSimulatorFork.getNetworkDetails(block.chainid);
+
+        (ABR_USDT_ADDRESS_ON_SPOKE, USDT_USD) = deployERC20ContractAndAddPriceFeed("USDT", 6, 1);
+
+        (ABR_LINK_ADDRESS_ON_SPOKE, LINK_USD) = deployERC20ContractAndAddPriceFeed("LINK", 18, 10);
         arbSpokeContract = new SpokeContract(
             address(diamond),
             HUB_CHAIN_SELECTOR,
@@ -326,26 +304,27 @@ contract Base is Test, IDiamondCut {
             arbNetworkDetails.routerAddress,
             ARB_WETH_CONTRACT_ADDRESS
         );
-        arbSpokeContract.addToken(
-            ARB_USDT_CONTRACT_ADDRESS,
-            USDT_CONTRACT_ADDRESS
-        );
-        arbSpokeContract.addToken(
-            ARB_LINK_CONTRACT_ADDRESS,
-            LINK_CONTRACT_ADDRESS
-        );
-        arbSpokeContract.addToken(
-            ARB_WETH_CONTRACT_ADDRESS,
-            WETH_CONTRACT_ADDRESS
-        );
+
+        arbSpokeContract.addToken(ARB_USDT_CONTRACT_ADDRESS, USDT_CONTRACT_ADDRESS);
+
+        arbSpokeContract.addToken(ARB_LINK_CONTRACT_ADDRESS, LINK_CONTRACT_ADDRESS);
+
+        arbSpokeContract.addToken(ARB_WETH_CONTRACT_ADDRESS, WETH_CONTRACT_ADDRESS);
+
         arbSpokeContract.addToken(ETH_CONTRACT_ADDRESS, ETH_CONTRACT_ADDRESS);
+
+        arbSpokeContract.addUncrossedToken(ABR_USDT_ADDRESS_ON_SPOKE);
+        arbSpokeContract.addUncrossedToken(ABR_LINK_ADDRESS_ON_SPOKE);
+
         vm.deal(owner, 10000 ether);
         IWERC20(ARB_WETH_CONTRACT_ADDRESS).deposit{value: 10000 ether}();
 
         vm.selectFork(avaxFork);
-        Register.NetworkDetails
-            memory avaxNetworkDetails = ccipLocalSimulatorFork
-                .getNetworkDetails(block.chainid);
+        Register.NetworkDetails memory avaxNetworkDetails = ccipLocalSimulatorFork.getNetworkDetails(block.chainid);
+
+        (AVAX_USDT_ADDRESS_ON_SPOKE, USDT_USD) = deployERC20ContractAndAddPriceFeed("USDT", 6, 1);
+
+        (AVAX_LINK_ADDRESS_ON_SPOKE, LINK_USD) = deployERC20ContractAndAddPriceFeed("USDT", 18, 1);
         avaxSpokeContract = new SpokeContract(
             address(diamond),
             HUB_CHAIN_SELECTOR,
@@ -353,34 +332,20 @@ contract Base is Test, IDiamondCut {
             avaxNetworkDetails.routerAddress,
             avaxNetworkDetails.wrappedNativeAddress
         );
-        avaxSpokeContract.addToken(
-            AVAX_USDT_CONTRACT_ADDRESS,
-            USDT_CONTRACT_ADDRESS
-        );
-        avaxSpokeContract.addToken(
-            AVAX_LINK_CONTRACT_ADDRESS,
-            LINK_CONTRACT_ADDRESS
-        );
-        avaxSpokeContract.addToken(
-            avaxNetworkDetails.wrappedNativeAddress,
-            WETH_CONTRACT_ADDRESS
-        );
+
+        avaxSpokeContract.addToken(AVAX_USDT_CONTRACT_ADDRESS, USDT_CONTRACT_ADDRESS);
+        avaxSpokeContract.addToken(AVAX_LINK_CONTRACT_ADDRESS, LINK_CONTRACT_ADDRESS);
+        avaxSpokeContract.addToken(avaxNetworkDetails.wrappedNativeAddress, WETH_CONTRACT_ADDRESS);
         avaxSpokeContract.addToken(ETH_CONTRACT_ADDRESS, ETH_CONTRACT_ADDRESS);
 
-        vm.selectFork(hubFork);
-        ownerF.addSupportedChain(
-            arbNetworkDetails.chainSelector,
-            address(arbSpokeContract)
-        );
-        ownerF.addSupportedChain(
-            avaxNetworkDetails.chainSelector,
-            address(avaxSpokeContract)
-        );
+        avaxSpokeContract.addUncrossedToken(AVAX_USDT_ADDRESS_ON_SPOKE);
+        avaxSpokeContract.addUncrossedToken(AVAX_LINK_ADDRESS_ON_SPOKE);
 
-        ccipLocalSimulatorFork.requestLinkFromFaucet(
-            address(diamond),
-            1000000 ether
-        );
+        vm.selectFork(hubFork);
+        ownerF.addSupportedChain(arbNetworkDetails.chainSelector, address(arbSpokeContract));
+        ownerF.addSupportedChain(avaxNetworkDetails.chainSelector, address(avaxSpokeContract));
+
+        ccipLocalSimulatorFork.requestLinkFromFaucet(address(diamond), 1000000 ether);
     }
 
     function transferTokenToOwner() public {
@@ -390,16 +355,12 @@ contract Base is Test, IDiamondCut {
         ERC20Mock(LINK_CONTRACT_ADDRESS).mint(owner, 500 ether);
     }
 
-    function deployERC20ContractAndAddPriceFeed(
-        string memory _name,
-        uint8 _decimals,
-        int256 _initialAnswer
-    ) internal returns (address, address) {
+    function deployERC20ContractAndAddPriceFeed(string memory _name, uint8 _decimals, int256 _initialAnswer)
+        internal
+        returns (address, address)
+    {
         ERC20Mock _erc20 = new ERC20Mock();
-        MockV3Aggregator priceFeed = new MockV3Aggregator(
-            _decimals,
-            _initialAnswer * 1e8
-        );
+        MockV3Aggregator priceFeed = new MockV3Aggregator(_decimals, _initialAnswer * 1e8);
         vm.label(address(priceFeed), "Price Feed");
         vm.label(address(_erc20), _name);
         return (address(_erc20), address(priceFeed));
@@ -412,17 +373,14 @@ contract Base is Test, IDiamondCut {
     ///////////////////////////
     // LENDING POOL DEPOSIT
     /////////////////////////
+
     function _depositIntoLiquidityPool(address _token, uint256 _amount) public {
         ERC20Mock(_token).approve(address(liquidityPoolFacet), _amount);
         liquidityPoolFacet.deposit(_token, _amount);
     }
 
-    function _deployVault(
-        address token,
-        string memory name,
-        string memory symbol
-    ) public returns (address) {
-        return liquidityPoolFacet.deployProtocolAssetVault(token, name, symbol);
+    function _deployVault(address token, string memory name, string memory symbol) public returns (address) {
+        return ownerF.deployVault(token, name, symbol);
     }
 
     function _intializeProtocolPool(address tokenAddress) public {
@@ -437,11 +395,7 @@ contract Base is Test, IDiamondCut {
         uint256 _initialSupply = 100 ether;
 
         OwnershipFacet(address(diamond)).initializeProtocolPool(
-            tokenAddress,
-            _reserveFactor,
-            _optimalUtilization,
-            _baseRate,
-            _slopeRate
+            tokenAddress, _reserveFactor, _optimalUtilization, _baseRate, _slopeRate
         );
 
         // (address token,,, uint256 reserveFactor, uint256 optimalUtilization,,, bool isActive,) =
@@ -453,12 +407,7 @@ contract Base is Test, IDiamondCut {
         // assertTrue(isActive);
     }
 
-    function xdepositIntoLiquidityPool(
-        address _token,
-        uint256 _amount,
-        uint256 _fork,
-        address _user
-    ) public {
+    function xdepositIntoLiquidityPool(address _token, uint256 _amount, uint256 _fork, address _user) public {
         if (_token == ETH_CONTRACT_ADDRESS) {
             revert("ETH is not supported use _xDepositNativeCollateral");
         }
@@ -489,12 +438,7 @@ contract Base is Test, IDiamondCut {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
     }
 
-    function _xWithdrawnFromPool(
-        address _token,
-        uint256 _amount,
-        uint256 _fork,
-        address _user
-    ) public {
+    function _xWithdrawnFromPool(address _token, uint256 _amount, uint256 _fork, address _user) public {
         if (_fork == hubFork) {
             liquidityPoolFacet.withdraw(_token, _amount);
             return;
@@ -515,12 +459,7 @@ contract Base is Test, IDiamondCut {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(_fork);
     }
 
-    function _xborrowFromPool(
-        address _token,
-        uint256 _amount,
-        uint256 _fork,
-        address _user
-    ) public {
+    function _xborrowFromPool(address _token, uint256 _amount, uint256 _fork, address _user) public {
         if (_fork == hubFork) {
             liquidityPoolFacet.borrowFromPool(_token, _amount);
             return;
@@ -541,12 +480,7 @@ contract Base is Test, IDiamondCut {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(_fork);
     }
 
-    function xRepayFromPool(
-        address _token,
-        uint256 _amount,
-        uint256 _fork,
-        address _user
-    ) public {
+    function xRepayFromPool(address _token, uint256 _amount, uint256 _fork, address _user) public {
         if (_token == ETH_CONTRACT_ADDRESS) {
             revert("ETH is not supported use _xDepositNativeCollateral");
         }
@@ -578,12 +512,7 @@ contract Base is Test, IDiamondCut {
     /////////////////////////
     /////////////////////////
     /////////////////////////
-    function _xDepositCollateral(
-        address _token,
-        uint256 _amount,
-        uint256 _fork,
-        address _user
-    ) public {
+    function _xDepositCollateral(address _token, uint256 _amount, uint256 _fork, address _user) public {
         if (_token == ETH_CONTRACT_ADDRESS) {
             revert("ETH is not supported use _xDepositNativeCollateral");
         }
@@ -596,6 +525,7 @@ contract Base is Test, IDiamondCut {
             vm.selectFork(_fork);
             vm.deal(_user, 1 ether);
             ERC20Mock(_token).approve(address(arbSpokeContract), _amount);
+
             arbSpokeContract.depositCollateral{value: 1 ether}(_token, _amount);
         }
 
@@ -603,20 +533,13 @@ contract Base is Test, IDiamondCut {
             vm.selectFork(_fork);
             vm.deal(_user, 1 ether);
             ERC20Mock(_token).approve(address(avaxSpokeContract), _amount);
-            avaxSpokeContract.depositCollateral{value: 1 ether}(
-                _token,
-                _amount
-            );
+            avaxSpokeContract.depositCollateral{value: 1 ether}(_token, _amount);
         }
         //give ccipLocalSimulatorFork the ability to route messages
         ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
     }
 
-    function _xDepositNativeCollateral(
-        address _user,
-        uint256 _amount,
-        uint256 _fork
-    ) public {
+    function _xDepositNativeCollateral(address _user, uint256 _amount, uint256 _fork) public {
         if (_fork == hubFork) {
             _depositNativeCollateral(_user, _amount);
             return;
@@ -625,30 +548,19 @@ contract Base is Test, IDiamondCut {
         if (_fork == arbFork) {
             vm.selectFork(_fork);
             vm.deal(_user, _amount + 1 ether);
-            arbSpokeContract.depositCollateral{value: _amount + 1 ether}(
-                ETH_CONTRACT_ADDRESS,
-                _amount
-            );
+            arbSpokeContract.depositCollateral{value: _amount + 1 ether}(ETH_CONTRACT_ADDRESS, _amount);
         }
 
         if (_fork == avaxFork) {
             vm.selectFork(_fork);
             vm.deal(_user, _amount + 1 ether);
-            avaxSpokeContract.depositCollateral{value: _amount + 1 ether}(
-                ETH_CONTRACT_ADDRESS,
-                _amount
-            );
+            avaxSpokeContract.depositCollateral{value: _amount + 1 ether}(ETH_CONTRACT_ADDRESS, _amount);
         }
         //give ccipLocalSimulatorFork the ability to route messages
         ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
     }
 
-    function _xWithdrawCollateral(
-        address _token,
-        uint256 _amount,
-        uint256 _fork,
-        address _user
-    ) public {
+    function _xWithdrawCollateral(address _token, uint256 _amount, uint256 _fork, address _user) public {
         if (_fork == hubFork) {
             sharedFacet.withdrawCollateral(_token, _amount);
             return;
@@ -657,19 +569,13 @@ contract Base is Test, IDiamondCut {
         if (_fork == arbFork) {
             vm.selectFork(_fork);
             vm.deal(_user, 1 ether);
-            arbSpokeContract.withdrawCollateral{value: 1 ether}(
-                _token,
-                _amount
-            );
+            arbSpokeContract.withdrawCollateral{value: 1 ether}(_token, _amount);
         }
 
         if (_fork == avaxFork) {
             vm.selectFork(_fork);
             vm.deal(_user, 1 ether);
-            avaxSpokeContract.withdrawCollateral{value: 1 ether}(
-                _token,
-                _amount
-            );
+            avaxSpokeContract.withdrawCollateral{value: 1 ether}(_token, _amount);
         }
         //give ccipLocalSimulatorFork the ability to route messages
         ccipLocalSimulatorFork.switchChainAndRouteMessage(hubFork);
@@ -678,15 +584,10 @@ contract Base is Test, IDiamondCut {
 
     function _depositNativeCollateral(address _user, uint256 _amount) public {
         vm.deal(_user, _amount);
-        sharedFacet.depositCollateral{value: _amount}(
-            ETH_CONTRACT_ADDRESS,
-            _amount
-        );
+        sharedFacet.depositCollateral{value: _amount}(ETH_CONTRACT_ADDRESS, _amount);
     }
 
-    function generateSelectors(
-        string memory _facetName
-    ) internal returns (bytes4[] memory selectors) {
+    function generateSelectors(string memory _facetName) internal returns (bytes4[] memory selectors) {
         string[] memory cmd = new string[](3);
         cmd[0] = "node";
         cmd[1] = "scripts/genSelectors.js";
@@ -696,9 +597,7 @@ contract Base is Test, IDiamondCut {
     }
 
     function mkaddr(string memory name) public returns (address) {
-        address addr = address(
-            uint160(uint256(keccak256(abi.encodePacked(name))))
-        );
+        address addr = address(uint160(uint256(keccak256(abi.encodePacked(name)))));
         vm.label(addr, name);
         return addr;
     }
@@ -729,9 +628,5 @@ contract Base is Test, IDiamondCut {
         vm.stopPrank();
     }
 
-    function diamondCut(
-        FacetCut[] calldata _diamondCut,
-        address _init,
-        bytes calldata _calldata
-    ) external override {}
+    function diamondCut(FacetCut[] calldata _diamondCut, address _init, bytes calldata _calldata) external override {}
 }

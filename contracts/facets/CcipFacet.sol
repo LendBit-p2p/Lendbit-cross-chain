@@ -25,34 +25,18 @@ contract CcipFacet is CCIPReceiver {
      * - data: The data of the message.
      * - destTokenAmounts: The token amounts in the destination chain representation.
      */
-    function _ccipReceive(
-        Client.Any2EVMMessage memory message
-    ) internal override {
+    function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
         emit CCIPMessageReceived(
-            message.messageId,
-            message.sourceChainSelector,
-            message.sender,
-            message.destTokenAmounts
+            message.messageId, message.sourceChainSelector, message.sender, message.destTokenAmounts
         );
 
         //decode the data
-        (CCIPMessageType messageType, bytes memory messageData) = abi.decode(
-            message.data,
-            (CCIPMessageType, bytes)
-        );
+        (CCIPMessageType messageType, bytes memory messageData) = abi.decode(message.data, (CCIPMessageType, bytes));
 
-        _appStorage._resolveCCIPMessage(
-            messageType,
-            messageData,
-            message.sourceChainSelector,
-            message.destTokenAmounts
-        );
+        _appStorage._resolveCCIPMessage(messageType, messageData, message.sourceChainSelector, message.destTokenAmounts);
 
         emit CCIPMessageExecuted(
-            message.messageId,
-            message.sourceChainSelector,
-            message.sender,
-            message.destTokenAmounts
+            message.messageId, message.sourceChainSelector, message.sender, message.destTokenAmounts
         );
         _appStorage.s_messageConsumed[message.messageId] = true;
     }
