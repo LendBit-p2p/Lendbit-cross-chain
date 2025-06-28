@@ -15,3 +15,4 @@ error Spoke__InvalidAmount();
 error Spoke__InvalidInterest();
 error Spoke__DateMustBeInFuture();
 error Spoke__InvalidRequest();
+error Spoke__AlreadyConsumed();

@@ -31,11 +31,20 @@ library LibxShared {
         uint64 _chainSelector
     ) internal {
         // Update the user's collateral and available balance in storage
-        _appStorage.s_addressToCollateralDeposited[_user][_tokenCollateralAddress] += _amountOfCollateral;
-        _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress] += _amountOfCollateral;
+        _appStorage.s_addressToCollateralDeposited[_user][
+            _tokenCollateralAddress
+        ] += _amountOfCollateral;
+        _appStorage.s_addressToAvailableBalance[_user][
+            _tokenCollateralAddress
+        ] += _amountOfCollateral;
 
         // Emit an event for the collateral deposit
-        emit CollateralDeposited(_user, _tokenCollateralAddress, _amountOfCollateral, _chainSelector);
+        emit CollateralDeposited(
+            _user,
+            _tokenCollateralAddress,
+            _amountOfCollateral,
+            _chainSelector
+        );
     }
 
     /**
@@ -52,7 +61,9 @@ library LibxShared {
         uint64 _chainSelector
     ) internal {
         // Retrieve the user's deposited amount for the specified token
-        uint256 depositedAmount = _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress];
+        uint256 depositedAmount = _appStorage.s_addressToAvailableBalance[
+            _user
+        ][_tokenCollateralAddress];
 
         // Check if the user has sufficient collateral to withdraw the requested amount
         if (depositedAmount < _amount) {
@@ -60,12 +71,19 @@ library LibxShared {
         }
 
         // Update storage to reflect the withdrawal of collateral
-        _appStorage.s_addressToCollateralDeposited[_user][_tokenCollateralAddress] -= _amount;
-        _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress] -= _amount;
+        _appStorage.s_addressToCollateralDeposited[_user][
+            _tokenCollateralAddress
+        ] -= _amount;
+        _appStorage.s_addressToAvailableBalance[_user][
+            _tokenCollateralAddress
+        ] -= _amount;
 
-        Client.EVMTokenAmount[] memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
+        Client.EVMTokenAmount[]
+            memory tokensToSendDetails = new Client.EVMTokenAmount[](1);
         tokensToSendDetails[0] = Client.EVMTokenAmount({
-            token: _tokenCollateralAddress == Constants.NATIVE_TOKEN ? Constants.WETH : _tokenCollateralAddress,
+            token: _tokenCollateralAddress == Constants.NATIVE_TOKEN
+                ? Constants.WETH
+                : _tokenCollateralAddress,
             amount: _amount
         });
 
@@ -75,7 +93,10 @@ library LibxShared {
             IWERC20(Constants.WETH).deposit{value: _amount}();
             IERC20(Constants.WETH).approve(Constants.CCIP_ROUTER, _amount);
         } else {
-            IERC20(_tokenCollateralAddress).approve(Constants.CCIP_ROUTER, _amount);
+            IERC20(_tokenCollateralAddress).approve(
+                Constants.CCIP_ROUTER,
+                _amount
+            );
         }
 
         //Handle Sending Of Token Crosschain.
@@ -87,10 +108,20 @@ library LibxShared {
             _user
         );
 
-        emit CCIPMessageSent(messageId, _chainSelector, abi.encode(_user), tokensToSendDetails);
+        emit CCIPMessageSent(
+            messageId,
+            _chainSelector,
+            abi.encode(_user),
+            tokensToSendDetails
+        );
 
         // Emit an event indicating successful collateral withdrawal
-        emit CollateralWithdrawn(_user, _tokenCollateralAddress, _amount, _chainSelector);
+        emit CollateralWithdrawn(
+            _user,
+            _tokenCollateralAddress,
+            _amount,
+            _chainSelector
+        );
     }
 
     /**
@@ -104,24 +135,49 @@ library LibxShared {
         address _user,
         address _tokenCollateralAddress,
         uint256 _amount,
-        uint64 _chainSelector
+        uint64 _chainSelector,
+        bool _isNative
     ) internal {
-        uint256 depositedAmount = _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress];
+        uint256 depositedAmount = _appStorage.s_addressToAvailableBalance[
+            _user
+        ][_tokenCollateralAddress];
 
         if (depositedAmount < _amount) {
             revert Protocol__InsufficientCollateralDeposited();
         }
 
-        _appStorage.s_addressToCollateralDeposited[_user][_tokenCollateralAddress] -= _amount;
+        _appStorage.s_addressToCollateralDeposited[_user][
+            _tokenCollateralAddress
+        ] -= _amount;
 
-        _appStorage.s_addressToAvailableBalance[_user][_tokenCollateralAddress] -= _amount;
+        _appStorage.s_addressToAvailableBalance[_user][
+            _tokenCollateralAddress
+        ] -= _amount;
 
-        (bytes32 messageId, Client.EVMTokenAmount[] memory tokensToSendDetails) = LibCCIP._notifyCrossChainTokenRelease(
-            _appStorage.s_senderSupported[_chainSelector], _user, _tokenCollateralAddress, _amount, _chainSelector
+        (
+            bytes32 messageId,
+            Client.EVMTokenAmount[] memory tokensToSendDetails
+        ) = LibCCIP._notifyCrossChainTokenRelease(
+                _appStorage.s_senderSupported[_chainSelector],
+                _user,
+                _tokenCollateralAddress,
+                _amount,
+                _chainSelector,
+                _isNative
+            );
+
+        emit CCIPMessageSent(
+            messageId,
+            _chainSelector,
+            abi.encode(_user),
+            tokensToSendDetails
         );
 
-        emit CCIPMessageSent(messageId, _chainSelector, abi.encode(_user), tokensToSendDetails);
-
-        emit CollateralWithdrawn(_user, _tokenCollateralAddress, _amount, _chainSelector);
+        emit CollateralWithdrawn(
+            _user,
+            _tokenCollateralAddress,
+            _amount,
+            _chainSelector
+        );
     }
 }

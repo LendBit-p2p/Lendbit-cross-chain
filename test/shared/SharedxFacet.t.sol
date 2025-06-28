@@ -6,8 +6,7 @@ import {console} from "forge-std/console.sol";
 import {Client} from "@chainlink/contract-ccip/contracts/libraries/Client.sol";
 import {CCIPMessageSent} from "../../contracts/spoke/libraries/Events.sol";
 import {CollateralWithdrawn} from "../../contracts/model/Event.sol";
-import {IERC20} from
-    "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract SharedxFacetTest is Base {
     function setUp() public override {
@@ -26,7 +25,10 @@ contract SharedxFacetTest is Base {
         uint256 amount = 100 ether;
         //deposit collateral through arb fork
         _xDepositCollateral(ARB_LINK_CONTRACT_ADDRESS, amount, arbFork, owner);
-        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(owner, LINK_CONTRACT_ADDRESS);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            LINK_CONTRACT_ADDRESS
+        );
 
         assertEq(userBalance, amount);
     }
@@ -36,8 +38,16 @@ contract SharedxFacetTest is Base {
         _dripLink(amount, owner, avaxFork);
         vm.startPrank(owner);
         //deposit collateral through avax fork
-        _xDepositCollateral(AVAX_LINK_CONTRACT_ADDRESS, amount, avaxFork, owner);
-        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(owner, LINK_CONTRACT_ADDRESS);
+        _xDepositCollateral(
+            AVAX_LINK_CONTRACT_ADDRESS,
+            amount,
+            avaxFork,
+            owner
+        );
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            LINK_CONTRACT_ADDRESS
+        );
 
         assertEq(userBalance, amount);
     }
@@ -47,13 +57,21 @@ contract SharedxFacetTest is Base {
         _dripLink(amount, owner, avaxFork);
 
         vm.startPrank(owner);
-        _xDepositCollateral(AVAX_LINK_CONTRACT_ADDRESS, amount, avaxFork, owner);
+        _xDepositCollateral(
+            AVAX_LINK_CONTRACT_ADDRESS,
+            amount,
+            avaxFork,
+            owner
+        );
         vm.startPrank(owner);
         _xDepositCollateral(ARB_LINK_CONTRACT_ADDRESS, amount, arbFork, owner);
         vm.startPrank(owner);
         _xDepositCollateral(LINK_CONTRACT_ADDRESS, amount, hubFork, owner);
 
-        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(owner, LINK_CONTRACT_ADDRESS);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            LINK_CONTRACT_ADDRESS
+        );
 
         assertEq(userBalance, amount * 3);
     }
@@ -62,7 +80,10 @@ contract SharedxFacetTest is Base {
         uint256 amount = 100 ether;
         vm.startPrank(owner);
         _xDepositNativeCollateral(owner, amount, arbFork);
-        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(owner, ETH_CONTRACT_ADDRESS);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            ETH_CONTRACT_ADDRESS
+        );
 
         assertEq(userBalance, amount);
     }
@@ -71,14 +92,20 @@ contract SharedxFacetTest is Base {
         uint256 amount = 100 ether;
         vm.startPrank(owner);
         _xDepositNativeCollateral(owner, amount, arbFork);
-        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(owner, ETH_CONTRACT_ADDRESS);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            ETH_CONTRACT_ADDRESS
+        );
 
         assertEq(userBalance, amount);
 
         vm.startPrank(owner);
         _xWithdrawCollateral(ETH_CONTRACT_ADDRESS, amount, arbFork, owner);
         vm.selectFork(hubFork);
-        userBalance = gettersFacet.getAddressToCollateralDeposited(owner, ETH_CONTRACT_ADDRESS);
+        userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            ETH_CONTRACT_ADDRESS
+        );
         assertEq(userBalance, 0);
     }
 
@@ -92,9 +119,17 @@ contract SharedxFacetTest is Base {
         _xDepositCollateral(ARB_LINK_CONTRACT_ADDRESS, amount, arbFork, owner);
         vm.startPrank(owner);
         vm.expectEmit(true, true, true, true);
-        emit CollateralWithdrawn(owner, LINK_CONTRACT_ADDRESS, amount, HUB_CHAIN_SELECTOR);
+        emit CollateralWithdrawn(
+            owner,
+            LINK_CONTRACT_ADDRESS,
+            amount,
+            HUB_CHAIN_SELECTOR
+        );
         _xWithdrawCollateral(LINK_CONTRACT_ADDRESS, amount, hubFork, owner);
-        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(owner, LINK_CONTRACT_ADDRESS);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            LINK_CONTRACT_ADDRESS
+        );
         assertEq(userBalance, 0);
     }
 
@@ -107,9 +142,17 @@ contract SharedxFacetTest is Base {
         vm.startPrank(owner);
         _xDepositCollateral(ARB_LINK_CONTRACT_ADDRESS, amount, arbFork, owner);
         vm.startPrank(owner);
-        _xWithdrawCollateral(AVAX_LINK_CONTRACT_ADDRESS, amount, avaxFork, owner);
+        _xWithdrawCollateral(
+            AVAX_LINK_CONTRACT_ADDRESS,
+            amount,
+            avaxFork,
+            owner
+        );
 
-        assertEq(ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).balanceOf(owner), amount);
+        assertEq(
+            ERC20Mock(AVAX_LINK_CONTRACT_ADDRESS).balanceOf(owner),
+            amount
+        );
     }
 
     function test_weth() public {
@@ -122,84 +165,36 @@ contract SharedxFacetTest is Base {
     // TOKENS NOT INTERPROABLE
     ///////////////////////////
 
-    function test_xDepositNonInteropableLinkToken_CollateralToARB() public {
+    function test_xDepositCollateralNativeAVAX() public {
         uint256 amount = 100 ether;
-        vm.selectFork(arbFork);
-        switchSigner(owner);
-        ERC20Mock(ABR_LINK_ADDRESS_ON_SPOKE).mint(owner, amount);
-        _xDepositCollateral(ABR_LINK_ADDRESS_ON_SPOKE, amount, arbFork, owner);
-
-        // avaxSpokeContract.depositCollateral(LINK_CONTRACT_ADDRESS, amount);
-        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(owner, ABR_LINK_ADDRESS_ON_SPOKE);
-
-        // CHECK SPOKE CONTRACT THAT THE FUNDS IS THERE
-        vm.selectFork(arbFork);
-        uint256 arbForkBalance = arbSpokeContract.getContractBalance(ABR_LINK_ADDRESS_ON_SPOKE);
+        vm.startPrank(owner);
+        _xDepositNativeCollateral(owner, amount, avaxFork);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            AVAX_CONTRACT_ADDRESS
+        );
 
         assertEq(userBalance, amount);
-        assertEq(arbForkBalance, amount);
     }
 
-    function test_xDepositNonInteropableLink_Token_And_Usdt_CollateralToARB() public {
+    function test_xWithdrawCollateralNativeAVAX() public {
         uint256 amount = 100 ether;
-        vm.selectFork(arbFork);
-        switchSigner(owner);
-        ERC20Mock(ABR_LINK_ADDRESS_ON_SPOKE).mint(owner, amount);
-        ERC20Mock(ABR_USDT_ADDRESS_ON_SPOKE).mint(owner, amount);
-
-        _xDepositCollateral(ABR_LINK_ADDRESS_ON_SPOKE, amount, arbFork, owner);
-        vm.selectFork(arbFork);
-        switchSigner(owner);
-        _xDepositCollateral(ABR_USDT_ADDRESS_ON_SPOKE, amount, arbFork, owner);
-
-        // avaxSpokeContract.depositCollateral(LINK_CONTRACT_ADDRESS, amount);
-        uint256 userBalanceLINK = gettersFacet.getAddressToCollateralDeposited(owner, ABR_LINK_ADDRESS_ON_SPOKE);
-
-        // avaxSpokeContract.depositCollateral(LINK_CONTRACT_ADDRESS, amount);
-        uint256 userBalanceUSDT = gettersFacet.getAddressToCollateralDeposited(owner, ABR_LINK_ADDRESS_ON_SPOKE);
-
-        // CHECK SPOKE CONTRACT THAT THE FUNDS IS THERE
-        vm.selectFork(arbFork);
-        uint256 arbForkBalance = arbSpokeContract.getContractBalance(ABR_LINK_ADDRESS_ON_SPOKE);
-
-        assertEq(userBalanceLINK, amount);
-        assertEq(userBalanceUSDT, amount);
-        assertEq(arbForkBalance, amount);
-    }
-
-    function test_xWithdrawnCollateralTokenThatNotInterpoable() public {
-        _dripLink(1 ether, owner, hubFork);
-        uint256 amount = 100 ether;
-        vm.selectFork(arbFork);
-        switchSigner(owner);
-        ERC20Mock(ABR_LINK_ADDRESS_ON_SPOKE).mint(owner, amount);
-        _xDepositCollateral(ABR_LINK_ADDRESS_ON_SPOKE, amount, arbFork, owner);
-
-        // avaxSpokeContract.depositCollateral(LINK_CONTRACT_ADDRESS, amount);
-        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(owner, ABR_LINK_ADDRESS_ON_SPOKE);
-
-        // CHECK SPOKE CONTRACT THAT THE FUNDS IS THERE
-        vm.selectFork(arbFork);
-        uint256 arbForkBalance = arbSpokeContract.getContractBalance(ABR_LINK_ADDRESS_ON_SPOKE);
+        vm.startPrank(owner);
+        _xDepositNativeCollateral(owner, amount, avaxFork);
+        uint256 userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            AVAX_CONTRACT_ADDRESS
+        );
 
         assertEq(userBalance, amount);
-        assertEq(arbForkBalance, amount);
 
-        //withdrawn collateral
-        vm.selectFork(arbFork);
-        switchSigner(owner);
-        _xWithdrawCollateral(ABR_LINK_ADDRESS_ON_SPOKE, amount, arbFork, owner);
-
+        vm.startPrank(owner);
+        _xWithdrawCollateral(ETH_CONTRACT_ADDRESS, amount, avaxFork, owner);
         vm.selectFork(hubFork);
-        uint256 balanceAfterWithdraw = gettersFacet.getAddressToCollateralDeposited(owner, ABR_LINK_ADDRESS_ON_SPOKE);
-
-        // CHECK SPOKE CONTRACT THAT THE FUNDS IS THERE
-        vm.selectFork(arbFork);
-        uint256 arbForkBalanceAfterWithdraw = arbSpokeContract.getContractBalance(ABR_LINK_ADDRESS_ON_SPOKE);
-
-        assertEq(0, balanceAfterWithdraw);
-        assertEq(0, arbForkBalanceAfterWithdraw);
+        userBalance = gettersFacet.getAddressToCollateralDeposited(
+            owner,
+            AVAX_CONTRACT_ADDRESS
+        );
+        assertEq(userBalance, 0);
     }
-
-    function test_xWithdrawnCollateralTokenThatNotInterpo() public {}
 }

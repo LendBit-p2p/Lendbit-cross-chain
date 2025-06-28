@@ -63,6 +63,7 @@ contract Deployment is Script, IDiamondCut {
     address C;
 
     address[] _hubTokens;
+    string[] _hubSymbols;
     address[] _spokeTokens;
     address[] _priceFeed;
 
@@ -101,22 +102,53 @@ contract Deployment is Script, IDiamondCut {
     address WETH_USD = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
     address ETH_USD = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
 
-    function setUp() public {}
+    function setUp() public {
+        _hubTokens.push(USDT_CONTRACT_ADDRESS);
+        _hubTokens.push(LINK_CONTRACT_ADDRESS);
+        _hubTokens.push(WETH_CONTRACT_ADDRESS);
+        _hubTokens.push(ETH_CONTRACT_ADDRESS);
+        _hubTokens.push(DAI_CONTRACT_ADDRESS);
+
+        _hubSymbols.push("vUSDC");
+        _hubSymbols.push("vLINK");
+        _hubSymbols.push("vWETH");
+        _hubSymbols.push("vETH");
+        _hubSymbols.push("vDAI");
+
+        _priceFeed.push(USDT_USD);
+        _priceFeed.push(LINK_USD);
+        _priceFeed.push(WETH_USD);
+        _priceFeed.push(WETH_USD);
+        _priceFeed.push(DAI_USD);
+    }
     function run() external {
         // deployXDiamonds();
         // bytes32 salt = bytes32(abi.encodePacked("SpokeContractLendBit!"));
         // deploySpokes(salt);
         vm.startBroadcast();
-        OwnershipFacet(0x052C88f4f88c9330f6226cdC120ba173416134C3)
-            .addSupportedChain(
-                5224473277236331295,
-                0xe2923E98728e32f236380dDFfCf628c07339C818
-            );
-        OwnershipFacet(0x052C88f4f88c9330f6226cdC120ba173416134C3)
-            .addSupportedChain(
-                3478487238524512106,
-                0x1C0fbFf22C5Ab94bA0B5d46403b8101855355262
-            );
+        // OwnershipFacet(0x052C88f4f88c9330f6226cdC120ba173416134C3)
+        //     .addSupportedChain(
+        //         5224473277236331295,
+        //         0xe2923E98728e32f236380dDFfCf628c07339C818
+        //     );
+        // OwnershipFacet(0x052C88f4f88c9330f6226cdC120ba173416134C3)
+        //     .addSupportedChain(
+        //         3478487238524512106,
+        //         0x1C0fbFf22C5Ab94bA0B5d46403b8101855355262
+        //     );
+        uint256 _reserveFactor = 2000; // 20%
+        uint256 _optimalUtilization = 8000; // 80%
+        uint256 _baseRate = 500; // 5%
+        uint256 _slopeRate = 2000; // 20%
+        for (uint256 i = 0; i < _hubTokens.length; i++) {
+            LiquidityPoolFacet(
+                address(0x052C88f4f88c9330f6226cdC120ba173416134C3)
+            ).deployProtocolAssetVault(
+                    _hubTokens[i],
+                    _hubSymbols[i],
+                    _hubSymbols[i]
+                );
+        }
         vm.stopBroadcast();
 
         // console.log("Diamond deployed at: ", address(diamond));
@@ -155,18 +187,6 @@ contract Deployment is Script, IDiamondCut {
         sharedFacet = new SharedFacet();
         liquidityPoolFacet = new LiquidityPoolFacet();
         ccipFacet = new CcipFacet();
-
-        _hubTokens.push(USDT_CONTRACT_ADDRESS);
-        _hubTokens.push(LINK_CONTRACT_ADDRESS);
-        _hubTokens.push(WETH_CONTRACT_ADDRESS);
-        _hubTokens.push(ETH_CONTRACT_ADDRESS);
-        _hubTokens.push(DAI_CONTRACT_ADDRESS);
-
-        _priceFeed.push(USDT_USD);
-        _priceFeed.push(LINK_USD);
-        _priceFeed.push(WETH_USD);
-        _priceFeed.push(WETH_USD);
-        _priceFeed.push(DAI_USD);
 
         //upgrade diamond with facets
         FacetCut[] memory cut = new FacetCut[](7);
