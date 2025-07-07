@@ -26,8 +26,8 @@ Lendbit lets you **borrow on one blockchain and repay on another**. Your loans a
               │
     ┌─────────┼───────────┐
     │         │           │
-Arbitrum   Optimism   [More chains]
-(Spoke)    (Spoke)    (Coming soon)
+Arbitrum   Optimism   Avalanche
+(Spoke)    (Spoke)     (Spoke)
 ```
 
 **Hub (Base Chain)**: Stores all your loan information and collateral  
@@ -42,6 +42,7 @@ Arbitrum   Optimism   [More chains]
 ### Spoke Contracts
 - **Arbitrum Spoke**: `0x1C0fbFf22C5Ab94bA0B5d46403b8101855355262`
 - **Optimism Spoke**: `0xe2923E98728e32f236380dDFfCf628c07339C818`
+- **Avalanche Spoke**: `0xf6B39D70fDA787aB1cd9eF0DD6AC2190f34a6458`
 
 *Note: You can use any of these addresses to interact with your loans*
 

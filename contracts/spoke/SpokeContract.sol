@@ -1079,7 +1079,7 @@ contract SpokeContract is CCIPReceiver, Ownable {
         address _token,
         address _hubToken,
         TokenType _tokenType
-    ) external {
+    ) external onlyOwner {
         s_isTokenSupported[_token] = true;
         s_tokenToHubTokens[_token] = _hubToken;
         s_tokenToType[_token] = _tokenType;

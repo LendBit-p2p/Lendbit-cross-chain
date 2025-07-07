@@ -76,6 +76,8 @@ contract Deployment is Script, IDiamondCut {
     address LINK_CONTRACT_ADDRESS =
         address(0x46d4AafcEd9cc65089D1606e6cAE85fe6D7df456);
     address ETH_CONTRACT_ADDRESS = address(1);
+    address AVAX_CONTRACT_ADDRESS =
+        address(0x2cB2118262a75B494183b6c44De23e50776843eb);
     address ARB_LINK_CONTRACT_ADDRESS =
         address(0x23eb68D3C0472f6892c2d68B0F2A8F0f5282a7ED);
     address ARB_USDT_CONTRACT_ADDRESS =
@@ -103,23 +105,24 @@ contract Deployment is Script, IDiamondCut {
     address ETH_USD = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
 
     function setUp() public {
-        _hubTokens.push(USDT_CONTRACT_ADDRESS);
-        _hubTokens.push(LINK_CONTRACT_ADDRESS);
-        _hubTokens.push(WETH_CONTRACT_ADDRESS);
-        _hubTokens.push(ETH_CONTRACT_ADDRESS);
-        _hubTokens.push(DAI_CONTRACT_ADDRESS);
+        _hubTokens.push(AVAX_CONTRACT_ADDRESS);
+        // _hubTokens.push(LINK_CONTRACT_ADDRESS);
+        // _hubTokens.push(WETH_CONTRACT_ADDRESS);
+        // _hubTokens.push(ETH_CONTRACT_ADDRESS);
+        // _hubTokens.push(DAI_CONTRACT_ADDRESS);
 
-        _hubSymbols.push("vUSDC");
-        _hubSymbols.push("vLINK");
-        _hubSymbols.push("vWETH");
-        _hubSymbols.push("vETH");
-        _hubSymbols.push("vDAI");
+        // _hubSymbols.push("vUSDC");
+        // _hubSymbols.push("vLINK");
+        // _hubSymbols.push("vWETH");
+        // _hubSymbols.push("vETH");
+        // _hubSymbols.push("vDAI");
 
-        _priceFeed.push(USDT_USD);
+        // _priceFeed.push(USDT_USD);
+        // _priceFeed.push(LINK_USD);
         _priceFeed.push(LINK_USD);
-        _priceFeed.push(WETH_USD);
-        _priceFeed.push(WETH_USD);
-        _priceFeed.push(DAI_USD);
+        // _priceFeed.push(WETH_USD);
+        // _priceFeed.push(WETH_USD);
+        // _priceFeed.push(DAI_USD);
     }
     function run() external {
         // deployXDiamonds();
@@ -128,27 +131,37 @@ contract Deployment is Script, IDiamondCut {
         vm.startBroadcast();
         // OwnershipFacet(0x052C88f4f88c9330f6226cdC120ba173416134C3)
         //     .addSupportedChain(
-        //         5224473277236331295,
-        //         0xe2923E98728e32f236380dDFfCf628c07339C818
+        //         14767482510784806043,
+        //         0xf6B39D70fDA787aB1cd9eF0DD6AC2190f34a6458
         //     );
+        // OwnershipFacet(0x052C88f4f88c9330f6226cdC120ba173416134C3)
+        //     .addCollateralTokens(_hubTokens, _priceFeed);
         // OwnershipFacet(0x052C88f4f88c9330f6226cdC120ba173416134C3)
         //     .addSupportedChain(
         //         3478487238524512106,
         //         0x1C0fbFf22C5Ab94bA0B5d46403b8101855355262
         //     );
-        uint256 _reserveFactor = 2000; // 20%
-        uint256 _optimalUtilization = 8000; // 80%
-        uint256 _baseRate = 500; // 5%
-        uint256 _slopeRate = 2000; // 20%
-        for (uint256 i = 0; i < _hubTokens.length; i++) {
-            LiquidityPoolFacet(
-                address(0x052C88f4f88c9330f6226cdC120ba173416134C3)
-            ).deployProtocolAssetVault(
-                    _hubTokens[i],
-                    _hubSymbols[i],
-                    _hubSymbols[i]
-                );
-        }
+        SpokeContract(payable(0xf6B39D70fDA787aB1cd9eF0DD6AC2190f34a6458))
+            .addToken(
+                ETH_CONTRACT_ADDRESS,
+                AVAX_CONTRACT_ADDRESS,
+                SpokeContract.TokenType.CHAIN_SPECIFIC
+            );
+        // FoR UPGRADING THE CONTRACT
+        // upgradeDiamond(0x052C88f4f88c9330f6226cdC120ba173416134C3);
+        // uint256 _reserveFactor = 2000; // 20%
+        // uint256 _optimalUtilization = 8000; // 80%
+        // uint256 _baseRate = 500; // 5%
+        // uint256 _slopeRate = 2000; // 20%
+        // for (uint256 i = 0; i < _hubTokens.length; i++) {
+        //     LiquidityPoolFacet(
+        //         address(0x052C88f4f88c9330f6226cdC120ba173416134C3)
+        //     ).deployProtocolAssetVault(
+        //             _hubTokens[i],
+        //             _hubSymbols[i],
+        //             _hubSymbols[i]
+        //         );
+        // }
         vm.stopBroadcast();
 
         // console.log("Diamond deployed at: ", address(diamond));
@@ -352,6 +365,34 @@ contract Deployment is Script, IDiamondCut {
         // vm.stopBroadcast();
     }
 
+    function upgradeDiamond(address _diamondAddress) public {
+        diamond = Diamond(payable(_diamondAddress));
+        dLoupe = new DiamondLoupeFacet();
+        ownerF = new OwnershipFacet();
+        protocolFacet = new ProtocolFacet();
+        gettersFacet = new GettersFacet();
+        sharedFacet = new SharedFacet();
+        liquidityPoolFacet = new LiquidityPoolFacet();
+        ccipFacet = new CcipFacet();
+
+        //upgrade diamond with facets
+        FacetCut[] memory cut = new FacetCut[](1);
+
+        cut[0] = (
+            FacetCut({
+                facetAddress: address(ccipFacet),
+                action: FacetCutAction.Replace,
+                functionSelectors: generateSelectors("CcipFacet")
+            })
+        );
+
+        IDiamondCut(address(diamond)).diamondCut(cut, address(0x0), "");
+
+        //call a function
+        DiamondLoupeFacet(address(diamond)).facetAddresses();
+        console.log("Successfully Upgraded");
+    }
+
     function computeSpokeAddress(
         uint64 chainId,
         address hubContract,
@@ -417,16 +458,16 @@ contract Deployment is Script, IDiamondCut {
             HUB_CHAIN_SELECTOR,
             avaxNetworkDetails.linkAddress,
             avaxNetworkDetails.routerAddress,
-            OP_WETH
+            avaxNetworkDetails.wrappedNativeAddress
         );
         console.log("Predicted Spoke Contract address: ", predictedAddress);
 
-        avaxSpokeContract = new SpokeContract{salt: chainSpecificSalt}(
+        avaxSpokeContract = new SpokeContract(
             address(0x052C88f4f88c9330f6226cdC120ba173416134C3),
             HUB_CHAIN_SELECTOR,
             avaxNetworkDetails.linkAddress,
             avaxNetworkDetails.routerAddress,
-            OP_WETH
+            avaxNetworkDetails.wrappedNativeAddress
         );
 
         console.log(
@@ -438,11 +479,27 @@ contract Deployment is Script, IDiamondCut {
         //     "Deployed address doesn't match predicted address"
         // );
 
-        avaxSpokeContract.addToken(OP_USDC, USDT_CONTRACT_ADDRESS);
-        avaxSpokeContract.addToken(OP_LINK, LINK_CONTRACT_ADDRESS);
-        avaxSpokeContract.addToken(OP_WETH, WETH_CONTRACT_ADDRESS);
-        avaxSpokeContract.addToken(ETH_CONTRACT_ADDRESS, ETH_CONTRACT_ADDRESS);
-        avaxSpokeContract.addToken(OP_DAI, DAI_CONTRACT_ADDRESS);
+        avaxSpokeContract.addToken(
+            AVAX_USDT_CONTRACT_ADDRESS,
+            USDT_CONTRACT_ADDRESS,
+            SpokeContract.TokenType.INTEROPORABLE
+        );
+        avaxSpokeContract.addToken(
+            AVAX_LINK_CONTRACT_ADDRESS,
+            LINK_CONTRACT_ADDRESS,
+            SpokeContract.TokenType.INTEROPORABLE
+        );
+        // avaxSpokeContract.addToken(OP_WETH, WETH_CONTRACT_ADDRESS);
+        avaxSpokeContract.addToken(
+            ETH_CONTRACT_ADDRESS,
+            AVAX_CONTRACT_ADDRESS,
+            SpokeContract.TokenType.CHAIN_SPECIFIC
+        );
+        avaxSpokeContract.addToken(
+            AVAX_DAI_CONTRACT_ADDRESS,
+            DAI_CONTRACT_ADDRESS,
+            SpokeContract.TokenType.INTEROPORABLE
+        );
 
         vm.stopBroadcast();
     }
